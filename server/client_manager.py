@@ -18,32 +18,73 @@
 from server import fantacrypt
 from server import logger
 from server.exceptions import ClientError, AreaError
+from enum import Enum
+from server.constants import TargetType
+from heapq import heappop, heappush
 
 import time
+import re
+
 
 
 class ClientManager:
     class Client:
-        def __init__(self, server, transport, user_id):
+        def __init__(self, server, transport, user_id, ipid):
+            self.is_checked = False
             self.transport = transport
             self.hdid = ''
+            self.pm_mute = False
             self.id = user_id
             self.char_id = -1
             self.area = server.area_manager.default_area()
             self.server = server
             self.name = ''
+            self.fake_name = ''
             self.is_mod = False
+            self.is_dj = True
+            self.can_wtce = True
             self.pos = ''
+            self.is_cm = False
+            self.evi_list = []
+            self.disemvowel = False
+            self.gimp = False
             self.muted_global = False
             self.muted_adverts = False
+            self.muted_modcall = False
             self.is_muted = False
+            self.is_ooc_muted = False
+            self.pm_mute = False
             self.mod_call_time = 0
+            self.in_rp = False
+            self.ipid = ipid
+            self.voting = 0
+            self.voting_at = 0
+            self.is_checked = False
+            self.websocket = None
+            
+            #flood-guard stuff
+            self.mus_counter = 0
+            self.mus_mute_time = 0
+            self.mus_change_time = [x * self.server.config['music_change_floodguard']['interval_length'] for x in range(self.server.config['music_change_floodguard']['times_per_interval'])]
+            self.wtce_counter = 0
+            self.wtce_mute_time = 0
+            self.wtce_time = [x * self.server.config['wtce_floodguard']['interval_length'] for x in range(self.server.config['wtce_floodguard']['times_per_interval'])]
 
         def send_raw_message(self, msg):
-            self.transport.write(msg.encode('utf-8'))
+            if self.websocket:
+                self.websocket.send_text(msg.encode('utf-8'))
+            else:
+                self.transport.write(msg.encode('utf-8'))
 
         def send_command(self, command, *args):
             if args:
+                if command == 'MS':
+                    for evi_num in range(len(self.evi_list)):
+                        if self.evi_list[evi_num] == args[11]:
+                            lst = list(args)
+                            lst[11] = evi_num
+                            args = tuple(lst)
+                            break
                 self.send_raw_message('{}#{}#%'.format(command, '#'.join([str(x) for x in args])))
             else:
                 self.send_raw_message('{}#%'.format(command))
@@ -54,19 +95,74 @@ class ClientManager:
         def send_motd(self):
             self.send_host_message('=== MOTD ===\r\n{}\r\n============='.format(self.server.config['motd']))
 
+        def send_player_count(self):
+            self.send_host_message('{}/{} players online.'.format(
+                self.server.get_player_count(),
+                self.server.config['playerlimit']))
+
+        def is_valid_name(self, name):
+            name_ws = name.replace(' ', '')
+            if not name_ws or name_ws.isdigit():
+                return False
+            for client in self.server.client_manager.clients:
+                print(client.name == name)
+                if client.name == name:
+                    return False
+            return True
+            
         def disconnect(self):
             self.transport.close()
 
         def change_character(self, char_id, force=False):
             if not self.server.is_valid_char_id(char_id):
                 raise ClientError('Invalid Character ID.')
-            if not force and not self.area.is_char_available(char_id):
-                raise ClientError('Character not available.')
+            if not self.area.is_char_available(char_id):
+                if force:
+                    for client in self.area.clients:
+                        if client.char_id == char_id:
+                            client.char_select()
+                else:
+                    raise ClientError('Character not available.')
             old_char = self.get_char_name()
             self.char_id = char_id
+            self.pos = ''
             self.send_command('PV', self.id, 'CID', self.char_id)
             logger.log_server('[{}]Changed character from {} to {}.'
                               .format(self.area.id, old_char, self.get_char_name()), self)
+
+        def change_music_cd(self):
+            if self.is_mod or self.is_cm:
+                return 0
+            if self.mus_mute_time:
+                if time.time() - self.mus_mute_time < self.server.config['music_change_floodguard']['mute_length']:
+                    return self.server.config['music_change_floodguard']['mute_length'] - (time.time() - self.mus_mute_time)
+                else:
+                    self.mus_mute_time = 0
+            times_per_interval = self.server.config['music_change_floodguard']['times_per_interval']
+            interval_length = self.server.config['music_change_floodguard']['interval_length']
+            if time.time() - self.mus_change_time[(self.mus_counter - times_per_interval + 1) % times_per_interval] < interval_length:
+                self.mus_mute_time = time.time()
+                return self.server.config['music_change_floodguard']['mute_length']
+            self.mus_counter = (self.mus_counter + 1) % times_per_interval
+            self.mus_change_time[self.mus_counter] = time.time()
+            return 0
+
+        def wtce_mute(self):
+            if self.is_mod or self.is_cm:
+                return 0
+            if self.wtce_mute_time:
+                if time.time() - self.wtce_mute_time < self.server.config['wtce_floodguard']['mute_length']:
+                    return self.server.config['wtce_floodguard']['mute_length'] - (time.time() - self.wtce_mute_time)
+                else:
+                    self.wtce_mute_time = 0
+            times_per_interval = self.server.config['wtce_floodguard']['times_per_interval']
+            interval_length = self.server.config['wtce_floodguard']['interval_length']
+            if time.time() - self.wtce_time[(self.wtce_counter - times_per_interval + 1) % times_per_interval] < interval_length:
+                self.wtce_mute_time = time.time()
+                return self.server.config['music_change_floodguard']['mute_length']
+            self.wtce_counter = (self.wtce_counter + 1) % times_per_interval
+            self.wtce_time[self.wtce_counter] = time.time()
+            return 0
 
         def reload_character(self):
             try:
@@ -76,66 +172,100 @@ class ClientManager:
 
         def change_area(self, area):
             if self.area == area:
-                raise ClientError('You are already in this area.')
+                raise ClientError('User already in specified area.')
+            if area.is_locked and not self.is_mod and not self.ipid in area.invite_list:
+                self.send_host_message('This area is locked - you will be unable to send messages ICly.')
+                #raise ClientError("That area is locked!")
             old_area = self.area
             if not area.is_char_available(self.char_id):
                 try:
                     new_char_id = area.get_rand_avail_char_id()
                 except AreaError:
                     raise ClientError('No available characters in that area.')
-                self.area.remove_client(self)
-                self.area = area
-                area.new_client(self)
+
                 self.change_character(new_char_id)
                 self.send_host_message('Character taken, switched to {}.'.format(self.get_char_name()))
-            else:
-                self.area.remove_client(self)
-                self.area = area
-                area.new_client(self)
-            self.send_host_message('Changed area to {}.'.format(area.name))
+
+            self.area.remove_client(self)
+            self.area = area
+            area.new_client(self)
+
+            self.send_host_message('Changed area to {}.[{}]'.format(area.name, self.area.status))
             logger.log_server(
                 '[{}]Changed area from {} ({}) to {} ({}).'.format(self.get_char_name(), old_area.name, old_area.id,
                                                                    self.area.name, self.area.id), self)
             self.send_command('HP', 1, self.area.hp_def)
             self.send_command('HP', 2, self.area.hp_pro)
             self.send_command('BN', self.area.background)
+            self.send_command('LE', *self.area.get_evidence_list(self))
 
         def send_area_list(self):
             msg = '=== Areas ==='
+            lock = {True: '[LOCKED]', False: ''}
             for i, area in enumerate(self.server.area_manager.areas):
-                msg += '\r\nArea {}: {} (users: {})'.format(i, area.name, len(area.clients))
+                msg += '\r\nArea {}: {} (users: {}) [{}]'.format(i, area.name, len(area.clients), area.status)
                 if self.area == area:
                     msg += ' [*]'
-                msg += '\r\n[{}]'.format(area.status)
             self.send_host_message(msg)
 
-        def get_area_info(self, area_id):
+        def get_area_info(self, area_id, mods):
             info = ''
             try:
                 area = self.server.area_manager.get_area_by_id(area_id)
             except AreaError:
                 raise
             info += '= Area {}: {} =='.format(area.id, area.name)
-            sorted_clients = sorted(area.clients, key=lambda x: x.get_char_name())
+            sorted_clients = []
+            for client in area.clients:
+                if (not mods) or client.is_mod:
+                    sorted_clients.append(client)
+            sorted_clients = sorted(sorted_clients, key=lambda x: x.get_char_name())
             for c in sorted_clients:
-                info += '\r\n{}'.format(c.get_char_name())
+                info += '\r\n[{}] {}'.format(c.id, c.get_char_name())
                 if self.is_mod:
-                    info += ' ({})'.format(c.get_ip())
+                    info += ' (IPID: {}) (HDID: {}) '.format(c.ipid, c.hdid)
             return info
 
-        def send_area_info(self, area_id):
+        def send_area_info(self, area_id, mods): 
+            #if area_id is -1 then return all areas. If mods is True then return only mods
+            info = ''
+            if area_id == -1:
+                # all areas info
+                cnt = 0
+                info = '\n== Area List =='
+                for i in range(len(self.server.area_manager.areas)):
+                    if len(self.server.area_manager.areas[i].clients) > 0:
+                        cnt += len(self.server.area_manager.areas[i].clients)
+                        info += '\r\n{}'.format(self.get_area_info(i, mods))
+                info = 'Current online: {}'.format(cnt) + info
+            else:
+                try:
+                    info = 'People in this area: {}\n'.format(len(self.server.area_manager.areas[area_id].clients)) + self.get_area_info(area_id, mods)
+                except AreaError:
+                    raise
+            self.send_host_message(info)
+
+        def send_area_hdid(self, area_id):
             try:
-                info = self.get_area_info(area_id)
+                info = self.get_area_hdid(area_id)
             except AreaError:
                 raise
-            self.send_host_message(info)
+            self.send_host_message(info)				
 
-        def send_all_area_info(self):
-            info = '== Area List =='
-            for i in range(len(self.server.area_manager.areas)):
-                info += '\r\n{}'.format(self.get_area_info(i))
-            self.send_host_message(info)
+        def send_all_area_hdid(self):
+            info = '== HDID List =='
+            for i in range (len(self.server.area_manager.areas)):
+                 if len(self.server.area_manager.areas[i].clients) > 0:
+                    info += '\r\n{}'.format(self.get_area_hdid(i))
+            self.send_host_message(info)			
 
+        def send_all_area_ip(self):
+            info = '== IP List =='
+            for i in range (len(self.server.area_manager.areas)):
+                 if len(self.server.area_manager.areas[i].clients) > 0:
+                    info += '\r\n{}'.format(self.get_area_ip(i))
+            self.send_host_message(info)
+			
         def send_done(self):
             avail_char_ids = set(range(len(self.server.char_list))) - set([x.char_id for x in self.area.clients])
             char_list = [-1] * len(self.server.char_list)
@@ -145,8 +275,8 @@ class ClientManager:
             self.send_command('HP', 1, self.area.hp_def)
             self.send_command('HP', 2, self.area.hp_pro)
             self.send_command('BN', self.area.background)
+            self.send_command('LE', *self.area.get_evidence_list(self))
             self.send_command('MM', 1)
-            self.send_command('OPPASS', fantacrypt.fanta_encrypt(self.server.config['guardpass']))
             self.send_command('DONE')
 
         def char_select(self):
@@ -162,8 +292,11 @@ class ClientManager:
                 raise ClientError('Invalid password.')
 
         def get_ip(self):
-            return self.transport.get_extra_info('peername')[0]
+            return self.ipid
 
+        def get_ipreal(self):
+            return self.transport.get_extra_info('peername')[0]
+		
         def get_char_name(self):
             if self.char_id == -1:
                 return 'CHAR_SELECT'
@@ -180,53 +313,127 @@ class ClientManager:
         def can_call_mod(self):
             return (time.time() * 1000.0 - self.mod_call_time) > 0
 
+        def disemvowel_message(self, message):
+            message = re.sub("[aeiou]", "", message, flags=re.IGNORECASE)
+            return re.sub(r"\s+", " ", message)
+
+        # noinspection PyMethodMayBeStatic
+        def gimp_message(self, message):
+            message = ['ERP IS BAN',
+                       'I\'m fucking gimped because I\'m both autistic and a retard!',
+                       'HELP ME',
+                       'Boy, I sure do love Anongrill, the best admin, and the cutest!!!!!',
+                       'Bro is the broiest bro of the bro\'s that bro bro bro bro.',
+                       'GOD DAMN IT LD WE LOST THE FUCKING CUP AGAIN',
+                       'WHAT THE FUCK DOES NAMU EVEN DO',
+                       'I\'M SEVERELY AUTISTIC!!!!',
+                       '[PEES FREELY]',
+                       'KILL ME',
+                       'I found this place on reddit XD',
+                       'how do i redtext?',
+                       'Anyone else a fan of MLP?',
+                       'does this server have sans from undertale?',
+                       'what does call mod do',
+                       'I\'M PICKLE RIIIIIIIIIIICK',
+                       'does anyone have a miiverse account?',
+                       'Drop me a PM if you want to ERP',
+                       'Join my discord server please',
+                       'Add me on steam t. Syntere',
+                       'Civ V when?',
+                       'can I have mod pls?',
+                       'why is everyone a missingo?',
+                       'how 2 change areas?',
+                       'Haha I wonder what Maya\'s feet smell like, just wondering, haha, just as a joke you know? Haha',
+                       'Guys how do I win a case?',
+                       'My win loss ratio as prosecutor is 12:6',
+                       'why, my peanus weenus of course :) hahah! it\'s my weeeeeenus peanus! hahah :)',
+                       'raymond shiled is the mastermind of AAI2',
+                       'does anyone want to check out my tumblr? :3',
+                       '19 years of perfection, i don\'t play games to fucking lose',
+                       'nah... your taunts are fucking useless... only defeat angers me... by trying to taunt just earns you my pitty',
+                       'When do we remove dangits',
+                       'MODS STOP GIMPING ME',
+                       'Please don\'t say things like ni**er and f**k it\'s very rude and I don\'t like it',
+                       'Come back, lewdton.',
+                       'Chiaki is my waifu!',
+                       'PLAY NORMIES PLS',
+                       'omit what I just said I was gimped',
+                       'Fuck off jumbles',
+                       'his head was fuck up',
+                       'yea i lied',
+                       'Cofee knife',
+                       'Hide the rips.',
+                       'Turkey, a favorite of mine',
+                       'case?',
+                       '((Case?))',
+                       '((case?))',
+                       '( ( c a s e ? ) )',
+                       '(((((case????)))))',
+                       '((hello is someone casing here?))',
+                       '((pardon me, i might have just interrupted but is there a case going on in this area?))',
+                       '((status?))']
+            return random.choice(message)
+			
     def __init__(self, server):
         self.clients = set()
-        self.cur_id = 0
         self.server = server
+        self.cur_id = [i for i in range(self.server.config['playerlimit'])]
+        self.clients_list = []
 
     def new_client(self, transport):
-        c = self.Client(self.server, transport, self.cur_id)
+        c = self.Client(self.server, transport, heappop(self.cur_id), self.server.get_ipid(transport.get_extra_info('peername')[0]))
         self.clients.add(c)
-        self.cur_id += 1
         return c
 
+            
     def remove_client(self, client):
+        heappush(self.cur_id, client.id)
         self.clients.remove(client)
-
-    def get_targets_by_ip(self, ip):
-        clients = []
-        for client in self.clients:
-            if client.get_ip() == ip:
-                clients.append(client)
-        return clients
-
-    def get_targets_by_ooc_name(self, name):
-        clients = []
-        for client in self.clients:
-            if client.name.lower() == name.lower():
-                clients.append(client)
-        return clients
-
-    def get_targets(self, client, target):
-        # check if it's IP but only if mod
-        if client.is_mod:
-            clients = self.get_targets_by_ip(target)
-            if clients:
-                return clients
-        # check if it's a character name in the same area
-        c = client.area.get_target_by_char_name(target)
-        if c:
-            return [c]
-        # check if it's an OOC name
-        ooc = self.get_targets_by_ooc_name(target)
-        if ooc:
-            return ooc
-        return None
-
+		
+    def get_targets(self, client, key, value, local = False):
+        #possible keys: ip, OOC, id, cname, ipid, hdid
+        areas = None
+        if local:
+            areas = [client.area]
+        else:
+            areas = client.server.area_manager.areas
+        targets = []
+        if key == TargetType.ALL:
+            for nkey in range(6):
+                targets += self.get_targets(client, nkey, value, local)
+        for area in areas:
+            for client in area.clients:
+                if key == TargetType.IP:
+                    if value.lower().startswith(client.get_ipreal().lower()):
+                        targets.append(client)
+                elif key == TargetType.OOC_NAME:
+                    if value.lower().startswith(client.name.lower()) and client.name:
+                        targets.append(client)
+                elif key == TargetType.CHAR_NAME:
+                    if value.lower().startswith(client.get_char_name().lower()):
+                        targets.append(client)
+                elif key == TargetType.ID:
+                    if client.id == value:
+                        targets.append(client)
+                elif key == TargetType.IPID:
+                    if client.ipid == value:
+                        targets.append(client)
+                elif key == TargetType.HDID:
+                    if value == client.hdid:
+                        targets.append(client)
+        return targets
+            
+        
     def get_muted_clients(self):
         clients = []
         for client in self.clients:
             if client.is_muted:
+                clients.append(client)
+        return clients
+
+    def get_ooc_muted_clients(self):
+        clients = []
+        for client in self.clients:
+            if client.is_ooc_muted:
                 clients.append(client)
         return clients

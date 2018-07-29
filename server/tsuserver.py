@@ -18,6 +18,9 @@
 import asyncio
 
 import yaml
+import json
+import random
+import hashlib
 
 from server import logger
 from server.aoprotocol import AOProtocol
@@ -27,17 +30,23 @@ from server.client_manager import ClientManager
 from server.districtclient import DistrictClient
 from server.exceptions import ServerError
 from server.masterserverclient import MasterServerClient
-
+from server.serverpoll_manager import ServerpollManager
 
 class TsuServer3:
     def __init__(self):
+        self.config = None
+        self.allowed_iniswaps = None
+        self.loaded_ips = {}
+        self.load_config()
+        self.load_iniswaps()
         self.client_manager = ClientManager(self)
         self.area_manager = AreaManager(self)
-        self.ban_manager = BanManager()
-        self.version = 'tsuserver3dev'
+        self.serverpoll_manager = ServerpollManager(self)
+        self.ban_manager =  BanManager()
         self.software = 'tsuserver3'
+        self.version = 'tsuserver3dev'
         self.release = 3
-        self.major_version = 0
+        self.major_version = 1
         self.minor_version = 1
         self.char_list = None
         self.char_pages_ao1 = None
@@ -45,14 +54,16 @@ class TsuServer3:
         self.music_list_ao2 = None
         self.music_pages_ao1 = None
         self.backgrounds = None
-        self.config = None
-        self.load_config()
+        self.data = None
         self.load_characters()
         self.load_music()
         self.load_backgrounds()
+        self.load_data()
+        self.load_ids()
         self.district_client = None
         self.ms_client = None
-        logger.setup_logger(debug=self.config['debug'])
+        self.rp_mode = False
+        logger.setup_logger(debug=self.config['debug'], log_size=self.config['log_size'], log_backups=self.config['log_backups'])
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -60,10 +71,10 @@ class TsuServer3:
         bound_ip = '0.0.0.0'
         if self.config['local']:
             bound_ip = '127.0.0.1'
-
+        
         ao_server_crt = loop.create_server(lambda: AOProtocol(self), bound_ip, self.config['port'])
         ao_server = loop.run_until_complete(ao_server_crt)
-
+        
         if self.config['use_district']:
             self.district_client = DistrictClient(self)
             asyncio.ensure_future(self.district_client.connect(), loop=loop)
@@ -78,9 +89,7 @@ class TsuServer3:
             loop.run_forever()
         except KeyboardInterrupt:
             pass
-
         logger.log_debug('Server shutting down.')
-
         ao_server.close()
         loop.run_until_complete(ao_server.wait_closed())
         loop.close()
@@ -89,7 +98,13 @@ class TsuServer3:
         return str(self.release) + '.' + str(self.major_version) + '.' + str(self.minor_version)
 
     def new_client(self, transport):
+        ip = transport.get_extra_info('peername')[0]
         c = self.client_manager.new_client(transport)
+        if ip not in self.loaded_ips:
+            self.loaded_ips[ip] = 0
+        self.loaded_ips[ip] += 1
+        if self.rp_mode:
+            c.in_rp = True
         c.server = self
         c.area = self.area_manager.default_area()
         c.area.new_client(c)
@@ -98,29 +113,73 @@ class TsuServer3:
     def remove_client(self, client):
         client.area.remove_client(client)
         self.client_manager.remove_client(client)
+        
 
     def get_player_count(self):
         return len(self.client_manager.clients)
 
     def load_config(self):
-        with open('config/config.yaml', 'r') as cfg:
+        with open('config/config.yaml', 'r', encoding = 'utf-8') as cfg:
             self.config = yaml.load(cfg)
+            self.config['motd'] = self.config['motd'].replace('\\n', ' \n')
+        if 'music_change_floodguard' not in self.config:
+            self.config['music_change_floodguard'] = {'times_per_interval': 1,  'interval_length': 0, 'mute_length': 0}
+        if 'wtce_floodguard' not in self.config:
+            self.config['wtce_floodguard'] = {'times_per_interval': 1, 'interval_length': 0, 'mute_length': 0}
+        if 'log_size' not in self.config:
+            self.config['log_size'] = 1048576
+        if 'log_backups' not in self.config:
+            self.config['log_backups'] = 5
+
+    def load_ids(self):
+        self.hdid_list = {}
+        # load hdids
+        try:
+            with open('storage/hd_ids.json', 'r', encoding='utf-8') as whole_list:
+                self.hdid_list = json.loads(whole_list.read())
+        except:
+            logger.log_debug('Failed to load hd_ids.json from ./storage. If hd_ids.json is exist then remove it.')
 
     def load_characters(self):
-        with open('config/characters.yaml', 'r') as chars:
+        with open('config/characters.yaml', 'r', encoding = 'utf-8') as chars:
             self.char_list = yaml.load(chars)
         self.build_char_pages_ao1()
 
     def load_music(self):
-        with open('config/music.yaml', 'r') as music:
+        with open('config/music.yaml', 'r', encoding = 'utf-8') as music:
             self.music_list = yaml.load(music)
         self.build_music_pages_ao1()
         self.build_music_list_ao2()
-        
+
+    def load_data(self):
+        with open('config/data.yaml', 'r') as data:
+            self.data = yaml.load(data)
+
+    def save_data(self):
+        with open('config/data.yaml', 'w') as data:
+            json.dump(self.data, data)
+
+    def save_id(self):
+        with open('storage/hd_ids.json', 'w') as data:
+            json.dump(self.hdid_list, data)
+
+    def get_ipid(self, ip):
+        x = ip + str(self.config['server_number'])
+        hash_object = hashlib.sha256(x.encode('utf-8'))
+        hash = hash_object.hexdigest()[:12]
+        return hash
 
     def load_backgrounds(self):
-        with open('config/backgrounds.yaml', 'r') as bgs:
+        with open('config/backgrounds.yaml', 'r', encoding = 'utf-8') as bgs:
             self.backgrounds = yaml.load(bgs)
+            
+    def load_iniswaps(self):
+        try:
+            with open('config/iniswaps.yaml', 'r', encoding = 'utf-8') as iniswaps:
+                self.allowed_iniswaps = yaml.load(iniswaps)
+        except:
+            logger.log_debug('cannot find iniswaps.yaml')
+            
 
     def build_char_pages_ao1(self):
         self.char_pages_ao1 = [self.char_list[x:x + 10] for x in range(0, len(self.char_list), 10)]

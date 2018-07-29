@@ -16,13 +16,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
+import ipaddress
 
 from server.exceptions import ServerError
 
 
 class BanManager:
     def __init__(self):
-        self.bans = []
+        self.bans = {}
         self.load_banlist()
 
     def load_banlist(self):
@@ -30,25 +31,40 @@ class BanManager:
             with open('storage/banlist.json', 'r') as banlist_file:
                 self.bans = json.load(banlist_file)
         except FileNotFoundError:
-            return
+            with open('storage/banlist.json', 'w') as poll_list_file:
+                json.dump({}, poll_list_file)
+
 
     def write_banlist(self):
         with open('storage/banlist.json', 'w') as banlist_file:
             json.dump(self.bans, banlist_file)
 
     def add_ban(self, ip):
-        if ip not in self.bans:
-            self.bans.append(ip)
-        else:
-            raise ServerError('This IP is already banned.')
+        try:
+            x = len(ip)
+        except AttributeError:
+            raise ServerError('Argument must be an 12-digit number.')
+        if x == 12:
+            self.bans[ip] = True
+            self.write_banlist()
+
+    def remove_ban(self,client, ip):
+        try:
+            try:
+                int(ip)
+            except ValueError:
+                ipaddress.ip_address(ip)
+                ip = client.server.get_ipid(ip)
+        except ValueError:
+            if not len(ip) == 12:
+                raise ServerError('Argument must be an IP address or 10-digit number.')
+        del self.bans[ip]
         self.write_banlist()
 
-    def remove_ban(self, ip):
-        if ip in self.bans:
-            self.bans.remove(ip)
-        else:
-            raise ServerError('This IP is not banned.')
-        self.write_banlist()
+    def is_banned(self, ipid):        
+        try:
+            return self.bans[ipid]
+        except KeyError:
+            return False
 
-    def is_banned(self, ip):
-        return ip in self.bans
+

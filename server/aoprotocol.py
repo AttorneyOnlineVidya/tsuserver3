@@ -17,12 +17,15 @@
 
 import asyncio
 import re
+from time import localtime, strftime
 from enum import Enum
 
-from server import commands
-from server import logger
-from server.exceptions import ClientError, AreaError, ArgumentError, ServerError
-from server.fantacrypt import fanta_decrypt
+from . import commands
+from . import logger
+from .exceptions import ClientError, AreaError, ArgumentError, ServerError
+from .fantacrypt import fanta_decrypt
+from .evidence import EvidenceList
+from .websocket import WebSocket
 
 
 class AOProtocol(asyncio.Protocol):
@@ -41,6 +44,7 @@ class AOProtocol(asyncio.Protocol):
         self.client = None
         self.buffer = ''
         self.ping_timeout = None
+        self.websocket = None
 
     def data_received(self, data):
         """ Handles any data received from the network.
@@ -50,14 +54,39 @@ class AOProtocol(asyncio.Protocol):
 
         :param data: bytes of data
         """
-        # try to decode as utf-8, ignore any erroneous characters
-        self.buffer += data.decode('utf-8', 'ignore')
+                
+        
+        if self.websocket is None:
+            self.websocket = WebSocket(self.client, self)
+            if not self.websocket.handshake(data):
+                self.websocket = False
+            else:
+                self.client.websocket = self.websocket
+
+        buf = data
+        
+        if not self.client.is_checked and self.server.ban_manager.is_banned(self.client.ipid):
+            self.client.transport.close()
+        else:
+            self.client.is_checked = True
+        
+        if self.websocket:
+            buf = self.websocket.handle(data)
+
+        if buf is None:
+            buf = b''
+
+        if not isinstance(buf, str):
+            # try to decode as utf-8, ignore any erroneous characters
+            self.buffer += buf.decode('utf-8', 'ignore')
+        else:
+            self.buffer = buf
+
         if len(self.buffer) > 8192:
             self.client.disconnect()
         for msg in self.get_messages():
             if len(msg) < 2:
-                self.client.disconnect()
-                return
+                continue
             # general netcode structure is not great
             if msg[0] in ('#', '3', '4'):
                 if msg[0] == '#':
@@ -69,7 +98,7 @@ class AOProtocol(asyncio.Protocol):
                 cmd, *args = msg.split('#')
                 self.net_cmd_dispatcher[cmd](self, args)
             except KeyError:
-                return
+                logger.log_debug('[INC][UNK]{}'.format(msg), self.client)
 
     def connection_made(self, transport):
         """ Called upon a new client connecting
@@ -78,7 +107,7 @@ class AOProtocol(asyncio.Protocol):
         """
         self.client = self.server.new_client(transport)
         self.ping_timeout = asyncio.get_event_loop().call_later(self.server.config['timeout'], self.client.disconnect)
-        self.client.send_command('decryptor', 34)  # just fantacrypt things
+        asyncio.get_event_loop().call_later(0.25, self.client.send_command, 'decryptor', 34) # just fantacrypt things)
 
     def connection_lost(self, exc):
         """ User disconnected
@@ -135,10 +164,20 @@ class AOProtocol(asyncio.Protocol):
         if not self.validate_net_cmd(args, self.ArgType.STR, needs_auth=False):
             return
         self.client.hdid = args[0]
-        if self.server.ban_manager.is_banned(self.client.get_ip()):
-            self.client.disconnect()
-            return
-
+        ipid = self.client.ipid
+        try:
+            self.client.server.hdid_list[self.client.hdid]
+        except KeyError:
+            self.client.server.hdid_list[self.client.hdid] = []
+            self.client.server.save_id()
+        if not ipid in self.client.server.hdid_list[self.client.hdid]:
+            self.client.server.hdid_list[self.client.hdid].append(ipid)
+            self.client.server.save_id()
+        for ip_id in self.client.server.hdid_list[self.client.hdid]:
+            if self.server.ban_manager.is_banned(ip_id):
+                self.client.disconnect()
+                return
+        logger.log_server('Connected. HDID: {}.'.format(self.client.hdid), self.client)
         self.client.send_command('ID', self.client.id, self.server.software, self.server.get_version_string())
         self.client.send_command('PN', self.server.get_player_count() - 1, self.server.config['playerlimit'])
 
@@ -176,7 +215,7 @@ class AOProtocol(asyncio.Protocol):
 
         self.client.is_ao2 = True
 
-        self.client.send_command('FL', 'yellowtext', 'customobjections', 'flipping', 'fastloading', 'noencryption', 'deskmod')
+        self.client.send_command('FL', 'yellowtext', 'customobjections', 'flipping', 'fastloading', 'noencryption', 'deskmod', 'evidence')
 
     def net_cmd_ch(self, _):
         """ Periodically checks the connection.
@@ -296,7 +335,7 @@ class AOProtocol(asyncio.Protocol):
         if self.client.is_muted:  # Checks to see if the client has been muted by a mod
             self.client.send_host_message("You have been muted by a moderator")
             return
-        if not self.client.area.can_send_message():
+        if not self.client.area.can_send_message(self.client):
             return
         if not self.validate_net_cmd(args, self.ArgType.STR, self.ArgType.STR_OR_EMPTY, self.ArgType.STR,
                                      self.ArgType.STR,
@@ -304,7 +343,10 @@ class AOProtocol(asyncio.Protocol):
                                      self.ArgType.INT, self.ArgType.INT, self.ArgType.INT, self.ArgType.INT,
                                      self.ArgType.INT, self.ArgType.INT, self.ArgType.INT):
             return
-        msg_type, pre, folder, anim, text, pos, sfx, anim_type, cid, sfx_delay, button, unk, flip, ding, color = args
+        msg_type, pre, folder, anim, text, pos, sfx, anim_type, cid, sfx_delay, button, evidence, flip, ding, color = args
+        if self.client.area.is_iniswap(self.client, pre, anim, folder) and folder != self.client.get_char_name():
+            self.client.send_host_message("Iniswap is blocked in this area")
+            return
         if msg_type not in ('chat', '0', '1'):
             return
         if anim_type not in (0, 1, 2, 5, 6):
@@ -314,6 +356,8 @@ class AOProtocol(asyncio.Protocol):
         if sfx_delay < 0:
             return
         if button not in (0, 1, 2, 3, 4):
+            return
+        if evidence < 0:
             return
         if ding not in (0, 1):
             return
@@ -334,10 +378,22 @@ class AOProtocol(asyncio.Protocol):
             if pos not in ('def', 'pro', 'hld', 'hlp', 'jud', 'wit'):
                 return
         msg = text[:256]
+        if self.client.gimp: #If you're gimped, gimp message.
+            msg = self.client.gimp_message(msg)
+        if self.client.disemvowel: #If you're disemvoweled, replace string.
+            msg = self.client.disemvowel_message(msg)
+			
+			
+        self.client.pos = pos
+        if evidence:
+            if self.client.area.evi_list.evidences[self.client.evi_list[evidence] - 1].pos != 'all':
+                self.client.area.evi_list.evidences[self.client.evi_list[evidence] - 1].pos = 'all'
+                self.client.area.broadcast_evidence_list()
         self.client.area.send_command('MS', msg_type, pre, folder, anim, msg, pos, sfx, anim_type, cid,
-                                      sfx_delay, button, unk, flip, ding, color)
+                                      sfx_delay, button, self.client.evi_list[evidence], flip, ding, color)
         self.client.area.set_next_msg_delay(len(msg))
         logger.log_server('[IC][{}][{}]{}'.format(self.client.area.id, self.client.get_char_name(), msg), self.client)
+		
 
     def net_cmd_ct(self, args):
         """ OOC Message
@@ -345,13 +401,76 @@ class AOProtocol(asyncio.Protocol):
         CT#<name:string>#<message:string>#%
 
         """
+        if self.client.is_ooc_muted:  # Checks to see if the client has been muted by a mod
+            self.client.send_host_message("You have been muted by a moderator")
+            return
         if not self.validate_net_cmd(args, self.ArgType.STR, self.ArgType.STR):
             return
+        if self.client.name != args[0] and self.client.fake_name != args[0]:
+            if self.client.is_valid_name(args[0]):
+                self.client.name = args[0]
+                self.client.fake_name = args[0]
+            else:
+                self.client.fake_name = args[0]
         if self.client.name == '':
-            self.client.name = args[0]
+            self.client.send_host_message('You must insert a name with at least one letter.')
+            return
         if self.client.name.startswith(self.server.config['hostname']) or self.client.name.startswith('<dollar>G'):
             self.client.send_host_message('That name is reserved!')
             return
+
+			
+        if self.client.voting == 2:
+            polls = self.client.server.serverpoll_manager.show_poll_list()
+            choices = self.client.server.serverpoll_manager.get_poll_choices(polls[self.client.voting_at])
+            multi = self.client.server.serverpoll_manager.returnmulti(polls[self.client.voting_at])
+            if multi:
+                if args[1].lower() in [x.lower() for x in choices]:
+                    self.client.server.serverpoll_manager.add_vote(polls[self.client.voting_at], args[1].lower(),
+                                                                   self.client)
+                    self.client.send_host_message(
+                        'Voted {}. Choose another item to vote or type \'exit\' to stop voting.'.args[1])
+                elif args[1].lower() == "exit":
+                    self.client.send_host_message(
+                        'Thank you for voting. God bless and have a nice day.')
+                    self.client.voting_at = 0
+                    self.client.voting = 0
+                else:
+                    self.client.send_host_message(
+                        'Input Error, expected input is one of the choices, type "exit" to exit voting.')
+            else:
+                if args[1].lower() in [x.lower() for x in choices]:
+                    self.client.server.serverpoll_manager.add_vote(polls[self.client.voting_at], args[1].lower(), self.client)
+                else:
+                    self.client.send_host_message('Input Error, expected input is one of the choices, voting cancelled.')
+                self.client.voting_at = 0
+                self.client.voting = 0
+            return
+        if self.client.voting == 1:
+            num = -1
+            try:
+                num = int(args[1])
+            except:
+                self.client.send_host_message('Input Error, expected integer. \n Choose which poll to vote, enter 0 to cancel.')
+                return
+            if num in range(1, self.client.server.serverpoll_manager.poll_number()+1):
+                self.client.voting += 1
+                self.client.voting_at = num - 1
+                polls = self.client.server.serverpoll_manager.show_poll_list()
+                polldetail = self.client.server.serverpoll_manager.returndetail(polls[self.client.voting_at])
+                choices = self.client.server.serverpoll_manager.get_poll_choices(polls[self.client.voting_at])
+                if polldetail is None:
+                    self.client.send_host_message('Now voting for {}.) {}.\n Choices: \n{}\nType \'exit\' to cancel voting.'.format(num ,polls[self.client.voting_at], "\n ".join(choices)))
+                else:
+                    self.client.send_host_message('Now voting for {}.) {}.\n Details: {}.\n Choices: \n{}. Type \'exit\' to cancel voting'.format(num ,polls[self.client.voting_at], polldetail, "\n ".join(choices)))
+            elif num == 0:
+                self.client.voting = 0
+                self.client.send_host_message('Voting cancelled.')
+            else:
+                self.client.send_host_message('Input Error, out of range/invalid poll number.\n Choose which poll to vote, enter 0 to cancel. ')
+            return			
+
+			
         if args[1].startswith('/'):
             spl = args[1][1:].split(' ', 1)
             cmd = spl[0]
@@ -359,12 +478,16 @@ class AOProtocol(asyncio.Protocol):
             if len(spl) == 2:
                 arg = spl[1][:256]
             try:
-                getattr(commands, 'ooc_cmd_{}'.format(cmd))(self.client, arg)
+                called_function = 'ooc_cmd_{}'.format(cmd)
+                getattr(commands, called_function)(self.client, arg)
             except AttributeError:
+                print('Attribute error with ' + called_function)
                 self.client.send_host_message('Invalid command.')
             except (ClientError, AreaError, ArgumentError, ServerError) as ex:
                 self.client.send_host_message(ex)
         else:
+            if self.client.disemvowel:
+                args[1] = self.client.disemvowel_message(args[1])
             self.client.area.send_command('CT', self.client.name, args[1])
             logger.log_server(
                 '[OOC][{}][{}][{}]{}'.format(self.client.area.id, self.client.get_char_name(), self.client.name,
@@ -376,17 +499,23 @@ class AOProtocol(asyncio.Protocol):
         MC#<song_name:int>#<???:int>#%
 
         """
-        if self.client.is_muted:  # Checks to see if the client has been muted by a mod
-            self.client.send_host_message("You have been muted by a moderator")
-            return
-        if not self.validate_net_cmd(args, self.ArgType.STR, self.ArgType.INT):
-            return
-        if args[1] != self.client.char_id:
-            return
         try:
             area = self.server.area_manager.get_area_by_name(args[0])
             self.client.change_area(area)
         except AreaError:
+            if self.client.is_muted:  # Checks to see if the client has been muted by a mod
+                self.client.send_host_message("You have been muted by a moderator")
+                return
+            if not self.client.is_dj:
+                self.client.send_host_message('You were blockdj\'d by a moderator.')
+                return
+            if not self.validate_net_cmd(args, self.ArgType.STR, self.ArgType.INT):
+                return
+            if args[1] != self.client.char_id:
+                return
+            if self.client.change_music_cd():
+                self.client.send_host_message('You changed song too many times. Please try again after {} seconds.'.format(int(self.client.change_music_cd())))
+                return
             try:
                 name, length = self.server.get_song_data(args[0])
                 self.client.area.play_music(name, self.client.char_id, length)
@@ -407,12 +536,22 @@ class AOProtocol(asyncio.Protocol):
         if self.client.is_muted:  # Checks to see if the client has been muted by a mod
             self.client.send_host_message("You have been muted by a moderator")
             return
+        if not self.client.can_wtce:
+            self.client.send_host_message('You were blocked from using judge signs by a moderator.')
+            return
         if not self.validate_net_cmd(args, self.ArgType.STR):
             return
-        if args[0] not in ('testimony1', 'testimony2'):
+        if args[0] == 'testimony1':
+            sign = 'WT'
+        elif args[0] == 'testimony2':
+            sign = 'CE'
+        else:
+            return
+        if self.client.wtce_mute():
+            self.client.send_host_message('You used witness testimony/cross examination signs too many times. Please try again after {} seconds.'.format(int(self.client.wtce_mute())))
             return
         self.client.area.send_command('RT', args[0])
-        self.client.area.add_to_judgelog(self.client, 'used WT/CE')
+        self.client.area.add_to_judgelog(self.client, 'used {}'.format(sign))
         logger.log_server("[{}]{} Used WT/CE".format(self.client.area.id, self.client.get_char_name()), self.client)
 
     def net_cmd_hp(self, args):
@@ -434,6 +573,44 @@ class AOProtocol(asyncio.Protocol):
         except AreaError:
             return
 
+    def net_cmd_pe(self, args):
+        """ Adds a piece of evidence.
+
+        PE#<name: string>#<description: string>#<image: string>#%
+
+        """
+        if len(args) < 3:
+            return
+        #evi = Evidence(args[0], args[1], args[2], self.client.pos)
+        self.client.area.evi_list.add_evidence(self.client, args[0], args[1], args[2], 'all')
+        self.client.area.broadcast_evidence_list()
+    
+    def net_cmd_de(self, args):
+        """ Deletes a piece of evidence.
+
+        DE#<id: int>#%
+
+        """
+
+        self.client.area.evi_list.del_evidence(self.client, self.client.evi_list[int(args[0])])
+        self.client.area.broadcast_evidence_list()
+
+    def net_cmd_ee(self, args):
+        """ Edits a piece of evidence.
+
+        EE#<id: int>#<name: string>#<description: string>#<image: string>#%
+
+        """
+
+        if len(args) < 4:
+            return
+
+        evi = (args[1], args[2], args[3], 'all')
+
+        self.client.area.evi_list.edit_evidence(self.client, self.client.evi_list[int(args[0])], evi)
+        self.client.area.broadcast_evidence_list()
+
+
     def net_cmd_zz(self, _):
         """ Sent on mod call.
 
@@ -441,16 +618,22 @@ class AOProtocol(asyncio.Protocol):
         if self.client.is_muted:  # Checks to see if the client has been muted by a mod
             self.client.send_host_message("You have been muted by a moderator")
             return
-
+			
+        if self.client.muted_modcall:
+            self.client.send_host_message("You have muted modcalls")
+            return
+			
         if not self.client.can_call_mod():
             self.client.send_host_message("You must wait 30 seconds between mod calls.")
             return
 
-        self.server.send_all_cmd_pred('ZZ', '{} ({}) in {} ({})'
-                                      .format(self.client.get_char_name(), self.client.get_ip(), self.client.area.name,
+        current_time = strftime("%H:%M", localtime())
+
+        self.server.send_all_cmd_pred('ZZ', '[{}] {} ({}) in {} ({})'
+                                      .format(current_time, self.client.get_char_name(), self.client.get_ip(), self.client.area.name,
                                               self.client.area.id), pred=lambda c: c.is_mod)
         self.client.set_mod_call_delay()
-        logger.log_server('[{}]{} called a moderator.'.format(self.client.area.id, self.client.get_char_name()))
+        logger.log_server('[{}][{}]{} called a moderator.'.format(self.client.get_ip(), self.client.area.id, self.client.get_char_name()))
 
     def net_cmd_opKICK(self, args):
         self.net_cmd_ct(['opkick', '/kick {}'.format(args[0])])
@@ -476,6 +659,9 @@ class AOProtocol(asyncio.Protocol):
         'MC': net_cmd_mc,  # play song
         'RT': net_cmd_rt,  # WT/CE buttons
         'HP': net_cmd_hp,  # penalties
+        'PE': net_cmd_pe,  # add evidence
+        'DE': net_cmd_de,  # delete evidence
+        'EE': net_cmd_ee,  # edit evidence
         'ZZ': net_cmd_zz,  # call mod button
         'opKICK': net_cmd_opKICK,  # /kick with guard on
         'opBAN': net_cmd_opBAN,  # /ban with guard on

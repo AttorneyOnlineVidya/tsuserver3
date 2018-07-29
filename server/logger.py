@@ -16,11 +16,12 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import logging.handlers
 
 import time
 
 
-def setup_logger(debug):
+def setup_logger(debug, log_size, log_backups):
     logging.Formatter.converter = time.gmtime
     debug_formatter = logging.Formatter('[%(asctime)s UTC]%(message)s')
     srv_formatter = logging.Formatter('[%(asctime)s UTC]%(message)s')
@@ -28,7 +29,9 @@ def setup_logger(debug):
     debug_log = logging.getLogger('debug')
     debug_log.setLevel(logging.DEBUG)
 
-    debug_handler = logging.FileHandler('logs/debug.log', encoding='utf-8')
+    # 0 maxBytes = no rotation
+    # backupCount = number of old logs to save
+    debug_handler = logging.handlers.RotatingFileHandler('logs/debug.log', maxBytes = log_size, backupCount = log_backups, encoding='utf-8')
     debug_handler.setLevel(logging.DEBUG)
     debug_handler.setFormatter(debug_formatter)
     debug_log.addHandler(debug_handler)
@@ -39,11 +42,17 @@ def setup_logger(debug):
     server_log = logging.getLogger('server')
     server_log.setLevel(logging.INFO)
 
-    server_handler = logging.FileHandler('logs/server.log', encoding='utf-8')
+    server_handler = logging.handlers.RotatingFileHandler('logs/server.log', maxBytes = log_size, backupCount = log_backups, encoding='utf-8')
     server_handler.setLevel(logging.INFO)
     server_handler.setFormatter(srv_formatter)
     server_log.addHandler(server_handler)
 
+    serverpoll_log = logging.getLogger('serverpoll')
+    serverpoll_log.setLevel(logging.INFO)
+    serverpoll_handler = logging.FileHandler('logs/serverpoll.log', encoding='utf-8')
+    serverpoll_handler.setLevel(logging.INFO)
+    serverpoll_handler.setFormatter(srv_formatter)
+    serverpoll_log.addHandler(serverpoll_handler)
 
 def log_debug(msg, client=None):
     msg = parse_client_info(client) + msg
@@ -54,11 +63,14 @@ def log_server(msg, client=None):
     msg = parse_client_info(client) + msg
     logging.getLogger('server').info(msg)
 
+def log_serverpoll(msg, client=None):
+    msg = parse_client_info(client) + msg
+    logging.getLogger('serverpoll').info(msg)
 
 def parse_client_info(client):
     if client is None:
         return ''
-    info = client.get_ip()
+    info = client.get_ipreal()
     if client.is_mod:
         return '[{:<15}][{}][MOD]'.format(info, client.id)
     return '[{:<15}][{}]'.format(info, client.id)

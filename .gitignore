@@ -1,3 +1,8 @@
 /config/*
 /storage/*.json
 /logs/*.log
+
+/.idea/workspace.xml
+
+__pycache__/
+*.py[cod]
