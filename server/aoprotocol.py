@@ -643,8 +643,8 @@ class AOProtocol(asyncio.Protocol):
                                               self.client.area.name,
                                               self.client.area.id, reason), pred=lambda c: c.is_mod)
         self.client.set_mod_call_delay()
-        logger.log_server('[{}][{}]{} called a moderator.'.format(self.client.get_ip(), self.client.area.id,
-                                                                  self.client.get_char_name()))
+        logger.log_server('[{}][{}]{} called a moderator. Reason: {}'.format(self.client.get_ip(), self.client.area.id,
+                                                                             self.client.get_char_name(), reason))
 
     def net_cmd_opKICK(self, args):
         self.net_cmd_ct(['opkick', '/kick {}'.format(args[0])])
