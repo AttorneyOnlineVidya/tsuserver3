@@ -1,5 +1,5 @@
 /config/*
-/storage/*.json
+/storage/**/*.json
 /logs/*.log
 
 /.idea/workspace.xml
