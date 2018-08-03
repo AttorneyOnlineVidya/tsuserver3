@@ -16,17 +16,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import random
-
 import time
+
 import yaml
 
-from server.exceptions import AreaError
 from server.evidence import EvidenceList
+from server.exceptions import AreaError
 
 
 class AreaManager:
     class Area:
-        def __init__(self, area_id, server, name, background, bg_lock, evidence_mod = 'FFA', locking_allowed = False, iniswap_allowed = True):
+        def __init__(self, area_id, server, name, background, bg_lock, evidence_mod='FFA', locking_allowed=False,
+                     iniswap_allowed=True):
             self.iniswap_allowed = iniswap_allowed
             self.clients = set()
             self.invite_list = {}
@@ -58,7 +59,7 @@ class AreaManager:
             self.evidence_list.append(Evidence("wewz", "desc2", "2.png"))
             self.evidence_list.append(Evidence("weeeeeew", "desc3", "3.png"))
             """
-            
+
             self.is_locked = False
 
         def new_client(self, client):
@@ -71,12 +72,12 @@ class AreaManager:
                 self.owned = False
                 if self.is_locked:
                     self.unlock()
-        
+
         def unlock(self):
             self.is_locked = False
             self.invite_list = {}
             self.send_host_message('This area is open now.')
-        
+
         def is_char_available(self, char_id):
             return char_id not in [x.char_id for x in self.clients]
 
@@ -96,7 +97,7 @@ class AreaManager:
         def set_next_msg_delay(self, msg_length):
             delay = min(3000, 100 + 60 * msg_length)
             self.next_message_time = round(time.time() * 1000.0 + delay)
-        
+
         def is_iniswap(self, client, anim1, anim2, char):
             if self.iniswap_allowed:
                 return False
@@ -106,7 +107,7 @@ class AreaManager:
                 if client.get_char_name() in char_link and char in char_link:
                     return False
             return True
-        
+
         def play_music(self, name, cid, length=-1):
             self.send_command('MC', name, cid)
             if self.music_looper:
@@ -114,7 +115,6 @@ class AreaManager:
             if length > 0:
                 self.music_looper = asyncio.get_event_loop().call_later(length,
                                                                         lambda: self.play_music(name, -1, length))
-
 
         def can_send_message(self, client):
             if self.is_locked and not client.is_mod and not client.ipid in self.invite_list:
@@ -168,7 +168,6 @@ class AreaManager:
             """
             for client in self.clients:
                 client.send_command('LE', *self.get_evidence_list(client))
-    
 
     def __init__(self, server):
         self.server = server
@@ -187,7 +186,8 @@ class AreaManager:
             if 'iniswap_allowed' not in item:
                 item['iniswap_allowed'] = True
             self.areas.append(
-                self.Area(self.cur_id, self.server, item['area'], item['background'], item['bglock'], item['evidence_mod'], item['locking_allowed'], item['iniswap_allowed']))
+                self.Area(self.cur_id, self.server, item['area'], item['background'], item['bglock'],
+                          item['evidence_mod'], item['locking_allowed'], item['iniswap_allowed']))
             self.cur_id += 1
 
     def default_area(self):

@@ -31,7 +31,8 @@ def setup_logger(debug, log_size, log_backups):
 
     # 0 maxBytes = no rotation
     # backupCount = number of old logs to save
-    debug_handler = logging.handlers.RotatingFileHandler('logs/debug.log', maxBytes = log_size, backupCount = log_backups, encoding='utf-8')
+    debug_handler = logging.handlers.RotatingFileHandler('logs/debug.log', maxBytes=log_size, backupCount=log_backups,
+                                                         encoding='utf-8')
     debug_handler.setLevel(logging.DEBUG)
     debug_handler.setFormatter(debug_formatter)
     debug_log.addHandler(debug_handler)
@@ -42,7 +43,8 @@ def setup_logger(debug, log_size, log_backups):
     server_log = logging.getLogger('server')
     server_log.setLevel(logging.INFO)
 
-    server_handler = logging.handlers.RotatingFileHandler('logs/server.log', maxBytes = log_size, backupCount = log_backups, encoding='utf-8')
+    server_handler = logging.handlers.RotatingFileHandler('logs/server.log', maxBytes=log_size, backupCount=log_backups,
+                                                          encoding='utf-8')
     server_handler.setLevel(logging.INFO)
     server_handler.setFormatter(srv_formatter)
     server_log.addHandler(server_handler)
@@ -54,6 +56,7 @@ def setup_logger(debug, log_size, log_backups):
     serverpoll_handler.setFormatter(srv_formatter)
     serverpoll_log.addHandler(serverpoll_handler)
 
+
 def log_debug(msg, client=None):
     msg = parse_client_info(client) + msg
     logging.getLogger('debug').debug(msg)
@@ -63,9 +66,11 @@ def log_server(msg, client=None):
     msg = parse_client_info(client) + msg
     logging.getLogger('server').info(msg)
 
+
 def log_serverpoll(msg, client=None):
     msg = parse_client_info(client) + msg
     logging.getLogger('serverpoll').info(msg)
+
 
 def parse_client_info(client):
     if client is None:

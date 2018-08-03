@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
 import ipaddress
+import json
 
 from server.exceptions import ServerError
 
@@ -34,7 +34,6 @@ class BanManager:
             with open('storage/banlist.json', 'w') as poll_list_file:
                 json.dump({}, poll_list_file)
 
-
     def write_banlist(self):
         with open('storage/banlist.json', 'w') as banlist_file:
             json.dump(self.bans, banlist_file)
@@ -48,7 +47,7 @@ class BanManager:
             self.bans[ip] = True
             self.write_banlist()
 
-    def remove_ban(self,client, ip):
+    def remove_ban(self, client, ip):
         try:
             try:
                 int(ip)
@@ -61,10 +60,8 @@ class BanManager:
         del self.bans[ip]
         self.write_banlist()
 
-    def is_banned(self, ipid):        
+    def is_banned(self, ipid):
         try:
             return self.bans[ipid]
         except KeyError:
             return False
-
-
