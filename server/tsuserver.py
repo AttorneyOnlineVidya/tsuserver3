@@ -16,11 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import hashlib
+import json
 
 import yaml
-import json
-import random
-import hashlib
 
 from server import logger
 from server.aoprotocol import AOProtocol
@@ -32,6 +31,7 @@ from server.exceptions import ServerError
 from server.masterserverclient import MasterServerClient
 from server.serverpoll_manager import ServerpollManager
 
+
 class TsuServer3:
     def __init__(self):
         self.config = None
@@ -42,12 +42,12 @@ class TsuServer3:
         self.client_manager = ClientManager(self)
         self.area_manager = AreaManager(self)
         self.serverpoll_manager = ServerpollManager(self)
-        self.ban_manager =  BanManager()
+        self.ban_manager = BanManager()
         self.software = 'tsuserver3'
         self.version = 'tsuserver3dev'
         self.release = 3
-        self.major_version = 1
-        self.minor_version = 1
+        self.major_version = 2
+        self.minor_version = 0
         self.char_list = None
         self.char_pages_ao1 = None
         self.music_list = None
@@ -55,15 +55,18 @@ class TsuServer3:
         self.music_pages_ao1 = None
         self.backgrounds = None
         self.data = None
+        self.features = set()
         self.load_characters()
         self.load_music()
         self.load_backgrounds()
         self.load_data()
         self.load_ids()
+        self.enable_features()
         self.district_client = None
         self.ms_client = None
         self.rp_mode = False
-        logger.setup_logger(debug=self.config['debug'], log_size=self.config['log_size'], log_backups=self.config['log_backups'])
+        logger.setup_logger(debug=self.config['debug'], log_size=self.config['log_size'],
+                            log_backups=self.config['log_backups'])
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -71,10 +74,10 @@ class TsuServer3:
         bound_ip = '0.0.0.0'
         if self.config['local']:
             bound_ip = '127.0.0.1'
-        
+
         ao_server_crt = loop.create_server(lambda: AOProtocol(self), bound_ip, self.config['port'])
         ao_server = loop.run_until_complete(ao_server_crt)
-        
+
         if self.config['use_district']:
             self.district_client = DistrictClient(self)
             asyncio.ensure_future(self.district_client.connect(), loop=loop)
@@ -113,17 +116,16 @@ class TsuServer3:
     def remove_client(self, client):
         client.area.remove_client(client)
         self.client_manager.remove_client(client)
-        
 
     def get_player_count(self):
         return len(self.client_manager.clients)
 
     def load_config(self):
-        with open('config/config.yaml', 'r', encoding = 'utf-8') as cfg:
+        with open('config/config.yaml', 'r', encoding='utf-8') as cfg:
             self.config = yaml.load(cfg)
             self.config['motd'] = self.config['motd'].replace('\\n', ' \n')
         if 'music_change_floodguard' not in self.config:
-            self.config['music_change_floodguard'] = {'times_per_interval': 1,  'interval_length': 0, 'mute_length': 0}
+            self.config['music_change_floodguard'] = {'times_per_interval': 1, 'interval_length': 0, 'mute_length': 0}
         if 'wtce_floodguard' not in self.config:
             self.config['wtce_floodguard'] = {'times_per_interval': 1, 'interval_length': 0, 'mute_length': 0}
         if 'log_size' not in self.config:
@@ -141,12 +143,12 @@ class TsuServer3:
             logger.log_debug('Failed to load hd_ids.json from ./storage. If hd_ids.json is exist then remove it.')
 
     def load_characters(self):
-        with open('config/characters.yaml', 'r', encoding = 'utf-8') as chars:
+        with open('config/characters.yaml', 'r', encoding='utf-8') as chars:
             self.char_list = yaml.load(chars)
         self.build_char_pages_ao1()
 
     def load_music(self):
-        with open('config/music.yaml', 'r', encoding = 'utf-8') as music:
+        with open('config/music.yaml', 'r', encoding='utf-8') as music:
             self.music_list = yaml.load(music)
         self.build_music_pages_ao1()
         self.build_music_list_ao2()
@@ -170,16 +172,18 @@ class TsuServer3:
         return hash
 
     def load_backgrounds(self):
-        with open('config/backgrounds.yaml', 'r', encoding = 'utf-8') as bgs:
+        with open('config/backgrounds.yaml', 'r', encoding='utf-8') as bgs:
             self.backgrounds = yaml.load(bgs)
-            
+
     def load_iniswaps(self):
         try:
-            with open('config/iniswaps.yaml', 'r', encoding = 'utf-8') as iniswaps:
+            with open('config/iniswaps.yaml', 'r', encoding='utf-8') as iniswaps:
                 self.allowed_iniswaps = yaml.load(iniswaps)
         except:
             logger.log_debug('cannot find iniswaps.yaml')
-            
+
+    def enable_features(self):
+        self.features.add('modcall_reason')
 
     def build_char_pages_ao1(self):
         self.char_pages_ao1 = [self.char_list[x:x + 10] for x in range(0, len(self.char_list), 10)]

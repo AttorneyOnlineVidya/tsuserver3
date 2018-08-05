@@ -18,6 +18,7 @@
 
 import asyncio
 import time
+
 from server import logger
 
 
@@ -69,6 +70,7 @@ class MasterServerClient:
                         await self.send_server_info()
             if time.time() - lastping > 5:
                 if fl:
+                    self.writer.close()
                     return
                 lastping = time.time()
                 fl = True

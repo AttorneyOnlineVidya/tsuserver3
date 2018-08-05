@@ -15,16 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from server import fantacrypt
-from server import logger
-from server.exceptions import ClientError, AreaError
-from enum import Enum
-from server.constants import TargetType
+import re
+import time
 from heapq import heappop, heappush
 
-import time
-import re
-
+from server import logger
+from server.constants import TargetType
+from server.exceptions import ClientError, AreaError
 
 
 class ClientManager:
@@ -61,14 +58,16 @@ class ClientManager:
             self.voting_at = 0
             self.is_checked = False
             self.websocket = None
-            
-            #flood-guard stuff
+
+            # flood-guard stuff
             self.mus_counter = 0
             self.mus_mute_time = 0
-            self.mus_change_time = [x * self.server.config['music_change_floodguard']['interval_length'] for x in range(self.server.config['music_change_floodguard']['times_per_interval'])]
+            self.mus_change_time = [x * self.server.config['music_change_floodguard']['interval_length'] for x in
+                                    range(self.server.config['music_change_floodguard']['times_per_interval'])]
             self.wtce_counter = 0
             self.wtce_mute_time = 0
-            self.wtce_time = [x * self.server.config['wtce_floodguard']['interval_length'] for x in range(self.server.config['wtce_floodguard']['times_per_interval'])]
+            self.wtce_time = [x * self.server.config['wtce_floodguard']['interval_length'] for x in
+                              range(self.server.config['wtce_floodguard']['times_per_interval'])]
 
         def send_raw_message(self, msg):
             if self.websocket:
@@ -109,7 +108,7 @@ class ClientManager:
                 if client.name == name:
                     return False
             return True
-            
+
         def disconnect(self):
             self.transport.close()
 
@@ -135,12 +134,14 @@ class ClientManager:
                 return 0
             if self.mus_mute_time:
                 if time.time() - self.mus_mute_time < self.server.config['music_change_floodguard']['mute_length']:
-                    return self.server.config['music_change_floodguard']['mute_length'] - (time.time() - self.mus_mute_time)
+                    return self.server.config['music_change_floodguard']['mute_length'] - (
+                                time.time() - self.mus_mute_time)
                 else:
                     self.mus_mute_time = 0
             times_per_interval = self.server.config['music_change_floodguard']['times_per_interval']
             interval_length = self.server.config['music_change_floodguard']['interval_length']
-            if time.time() - self.mus_change_time[(self.mus_counter - times_per_interval + 1) % times_per_interval] < interval_length:
+            if time.time() - self.mus_change_time[
+                (self.mus_counter - times_per_interval + 1) % times_per_interval] < interval_length:
                 self.mus_mute_time = time.time()
                 return self.server.config['music_change_floodguard']['mute_length']
             self.mus_counter = (self.mus_counter + 1) % times_per_interval
@@ -157,7 +158,8 @@ class ClientManager:
                     self.wtce_mute_time = 0
             times_per_interval = self.server.config['wtce_floodguard']['times_per_interval']
             interval_length = self.server.config['wtce_floodguard']['interval_length']
-            if time.time() - self.wtce_time[(self.wtce_counter - times_per_interval + 1) % times_per_interval] < interval_length:
+            if time.time() - self.wtce_time[
+                (self.wtce_counter - times_per_interval + 1) % times_per_interval] < interval_length:
                 self.wtce_mute_time = time.time()
                 return self.server.config['music_change_floodguard']['mute_length']
             self.wtce_counter = (self.wtce_counter + 1) % times_per_interval
@@ -175,7 +177,7 @@ class ClientManager:
                 raise ClientError('User already in specified area.')
             if area.is_locked and not self.is_mod and not self.ipid in area.invite_list:
                 self.send_host_message('This area is locked - you will be unable to send messages ICly.')
-                #raise ClientError("That area is locked!")
+                # raise ClientError("That area is locked!")
             old_area = self.area
             if not area.is_char_available(self.char_id):
                 try:
@@ -226,8 +228,8 @@ class ClientManager:
                     info += ' (IPID: {}) (HDID: {}) '.format(c.ipid, c.hdid)
             return info
 
-        def send_area_info(self, area_id, mods): 
-            #if area_id is -1 then return all areas. If mods is True then return only mods
+        def send_area_info(self, area_id, mods):
+            # if area_id is -1 then return all areas. If mods is True then return only mods
             info = ''
             if area_id == -1:
                 # all areas info
@@ -240,7 +242,8 @@ class ClientManager:
                 info = 'Current online: {}'.format(cnt) + info
             else:
                 try:
-                    info = 'People in this area: {}\n'.format(len(self.server.area_manager.areas[area_id].clients)) + self.get_area_info(area_id, mods)
+                    info = 'People in this area: {}\n'.format(
+                        len(self.server.area_manager.areas[area_id].clients)) + self.get_area_info(area_id, mods)
                 except AreaError:
                     raise
             self.send_host_message(info)
@@ -250,22 +253,22 @@ class ClientManager:
                 info = self.get_area_hdid(area_id)
             except AreaError:
                 raise
-            self.send_host_message(info)				
+            self.send_host_message(info)
 
         def send_all_area_hdid(self):
             info = '== HDID List =='
-            for i in range (len(self.server.area_manager.areas)):
-                 if len(self.server.area_manager.areas[i].clients) > 0:
+            for i in range(len(self.server.area_manager.areas)):
+                if len(self.server.area_manager.areas[i].clients) > 0:
                     info += '\r\n{}'.format(self.get_area_hdid(i))
-            self.send_host_message(info)			
+            self.send_host_message(info)
 
         def send_all_area_ip(self):
             info = '== IP List =='
-            for i in range (len(self.server.area_manager.areas)):
-                 if len(self.server.area_manager.areas[i].clients) > 0:
+            for i in range(len(self.server.area_manager.areas)):
+                if len(self.server.area_manager.areas[i].clients) > 0:
                     info += '\r\n{}'.format(self.get_area_ip(i))
             self.send_host_message(info)
-			
+
         def send_done(self):
             avail_char_ids = set(range(len(self.server.char_list))) - set([x.char_id for x in self.area.clients])
             char_list = [-1] * len(self.server.char_list)
@@ -296,7 +299,7 @@ class ClientManager:
 
         def get_ipreal(self):
             return self.transport.get_extra_info('peername')[0]
-		
+
         def get_char_name(self):
             if self.char_id == -1:
                 return 'CHAR_SELECT'
@@ -373,7 +376,7 @@ class ClientManager:
                        '((pardon me, i might have just interrupted but is there a case going on in this area?))',
                        '((status?))']
             return random.choice(message)
-			
+
     def __init__(self, server):
         self.clients = set()
         self.server = server
@@ -381,17 +384,17 @@ class ClientManager:
         self.clients_list = []
 
     def new_client(self, transport):
-        c = self.Client(self.server, transport, heappop(self.cur_id), self.server.get_ipid(transport.get_extra_info('peername')[0]))
+        c = self.Client(self.server, transport, heappop(self.cur_id),
+                        self.server.get_ipid(transport.get_extra_info('peername')[0]))
         self.clients.add(c)
         return c
 
-            
     def remove_client(self, client):
         heappush(self.cur_id, client.id)
         self.clients.remove(client)
-		
-    def get_targets(self, client, key, value, local = False):
-        #possible keys: ip, OOC, id, cname, ipid, hdid
+
+    def get_targets(self, client, key, value, local=False):
+        # possible keys: ip, OOC, id, cname, ipid, hdid
         areas = None
         if local:
             areas = [client.area]
@@ -422,8 +425,7 @@ class ClientManager:
                     if value == client.hdid:
                         targets.append(client)
         return targets
-            
-        
+
     def get_muted_clients(self):
         clients = []
         for client in self.clients:

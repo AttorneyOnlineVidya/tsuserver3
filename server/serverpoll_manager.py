@@ -16,9 +16,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
-import yaml
+import os
 import time
-import os, errno
+
+import yaml
 
 from server import logger
 from server.exceptions import ServerError
@@ -109,7 +110,6 @@ class ServerpollManager:
                 return 1
         return 0
 
-
     def returndetail(self, value):
         for i in self.poll_list:
             if i[0].lower() == value.lower():
@@ -177,7 +177,7 @@ class ServerpollManager:
                 stream = open('storage/poll/{}.yaml'.format(output), 'r')
                 stream2 = yaml.load(stream)
                 stream2['choices'] = []
-                stream2['votes']  = {}
+                stream2['votes'] = {}
                 with open('storage/poll/{}.yaml'.format(output), 'w') as votelist_file:
                     yaml.dump(stream2, votelist_file, default_flow_style=False)
                 return stream2['choices']
@@ -188,7 +188,7 @@ class ServerpollManager:
         except IndexError:
             return
 
-    def remove_poll_choice(self,client, value, remove):
+    def remove_poll_choice(self, client, value, remove):
         try:
             if [i for i in self.poll_list if i[0] == "{}".format(value)]:
                 poll_selected = [i[1] for i in self.poll_list if i[0] == "{}".format(value)]
@@ -265,27 +265,38 @@ class ServerpollManager:
             stream = open('storage/poll/{} \'{}\'.yaml'.format(poll_voting[1], poll_voting[0]), 'r')
             self.vote = yaml.load(stream)
             log = self.vote['log']
-            if ([item for item in log if item[1] == client.ipid] or [item for item in log if item[2] == client.hdid]) and (not self.vote['multivote']):
+            if ([item for item in log if item[1] == client.ipid] or [item for item in log if
+                                                                     item[2] == client.hdid]) and (
+            not self.vote['multivote']):
                 # Now to log their failed vote
-                self.vote['log'] += (['FAILED VOTE',  tmp, client.ipid, client.hdid, vote, "{} ({}) at area {}".format(client.name, client.get_char_name(), client.area.name)],)
+                self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
+                                      "{} ({}) at area {}".format(client.name, client.get_char_name(),
+                                                                  client.area.name)],)
                 self.write_votelist(poll_voting)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' failed by {} ({}) in {}, with IP {} and HDID {}, at {}. Reason: Already voted.'.format(
-                        poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid, tmp))
+                        poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid,
+                        tmp))
                 client.send_host_message('You have already voted in this poll.')
-            elif [item for item in log if ((item[1] == client.ipid or item[2] == client.hdid) and (item[3].lower() == vote.lower()))]:
-                self.vote['log'] += (['FAILED VOTE',  tmp, client.ipid, client.hdid, vote, "{} ({}) at area {}".format(client.name, client.get_char_name(), client.area.name)],)
+            elif [item for item in log if
+                  ((item[1] == client.ipid or item[2] == client.hdid) and (item[3].lower() == vote.lower()))]:
+                self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
+                                      "{} ({}) at area {}".format(client.name, client.get_char_name(),
+                                                                  client.area.name)],)
                 self.write_votelist(poll_voting)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' failed by {} ({}) in {}, with IP {} and HDID {}, at {}. Reason: Already voted.'.format(
-                        poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid, tmp))
+                        poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid,
+                        tmp))
                 client.send_host_message('You have chosen this choice already.')
             else:
                 # If they aren't a filthy rigger, they should get to this point
                 if vote.lower() in [x.lower() for x in self.vote['choices']]:
                     self.vote['votes'][vote.lower()] += 1
                 tmp = time.strftime('%y-%m-%d %H:%M:%S')
-                self.vote['log'] += ([tmp, client.ipid, client.hdid, vote, "{} ({}) at area {}".format(client.name, client.get_char_name(), client.area.name)],)
+                self.vote['log'] += ([tmp, client.ipid, client.hdid, vote,
+                                      "{} ({}) at area {}".format(client.name, client.get_char_name(),
+                                                                  client.area.name)],)
                 self.write_votelist(poll_voting)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' added succesfully by {} ({}) in {}, with IP {} and HDID {}, at {}.'.format(

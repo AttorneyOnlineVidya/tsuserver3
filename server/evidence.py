@@ -21,11 +21,13 @@ class EvidenceList:
         def to_string(self):
             sequence = (self.name, self.desc, self.image)
             return '&'.join(sequence)
-            
+
     def __init__(self):
         self.evidences = []
-        self.poses = {'def':['def', 'hld'], 'pro':['pro', 'hlp'], 'wit':['wit'], 'hlp':['hlp', 'pro'], 'hld':['hld', 'def'], 'jud':['jud'], 'all':['hlp', 'hld', 'wit', 'jud', 'pro', 'def', ''], 'pos':[]}
-        
+        self.poses = {'def': ['def', 'hld'], 'pro': ['pro', 'hlp'], 'wit': ['wit'], 'hlp': ['hlp', 'pro'],
+                      'hld': ['hld', 'def'], 'jud': ['jud'], 'all': ['hlp', 'hld', 'wit', 'jud', 'pro', 'def', ''],
+                      'pos': []}
+
     def login(self, client):
         if client.area.evidence_mod == 'FFA':
             pass
@@ -44,13 +46,12 @@ class EvidenceList:
         if client.area.evidence_mod != 'HiddenCM':
             return True
         else:
-            #correct format: <owner = pos>\ndesc
+            # correct format: <owner = pos>\ndesc
             if desc[:9] == '<owner = ' and desc[9:12] in self.poses and desc[12:14] == '>\n':
                 return True
             return False
-            
-        
-    def add_evidence(self, client, name, description, image, pos = 'all'):
+
+    def add_evidence(self, client, name, description, image, pos='all'):
         if self.login(client):
             if client.area.evidence_mod == 'HiddenCM':
                 pos = 'pos'
@@ -58,11 +59,11 @@ class EvidenceList:
                 client.send_host_message('You can\'t have more than {} evidence items at a time.'.format(self.limit))
             else:
                 self.evidences.append(self.Evidence(name, description, image, pos))
-        
+
     def evidence_swap(self, client, id1, id2):
         if self.login(client):
             self.evidences[id1], self.evidences[id2] = self.evidences[id2], self.evidences[id1]
-            
+
     def create_evi_list(self, client):
         evi_list = []
         nums_list = [0]
@@ -70,16 +71,17 @@ class EvidenceList:
             if client.area.evidence_mod == 'HiddenCM' and self.login(client):
                 nums_list.append(i + 1)
                 evi = self.evidences[i]
-                evi_list.append(self.Evidence(evi.name, '<owner = {}>\n{}'.format(evi.pos, evi.desc), evi.image, evi.pos).to_string())
+                evi_list.append(self.Evidence(evi.name, '<owner = {}>\n{}'.format(evi.pos, evi.desc), evi.image,
+                                              evi.pos).to_string())
             elif client.pos in self.poses[self.evidences[i].pos]:
                 nums_list.append(i + 1)
                 evi_list.append(self.evidences[i].to_string())
         return nums_list, evi_list
-    
+
     def del_evidence(self, client, id):
         if self.login(client):
             self.evidences.pop(id)
-        
+
     def edit_evidence(self, client, id, arg):
         if self.login(client):
             if client.area.evidence_mod == 'HiddenCM' and self.correct_format(client, arg[1]):

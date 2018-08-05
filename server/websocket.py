@@ -18,7 +18,6 @@
 # Partly authored by Johan Hanssen Seferidis (MIT license):
 # https://github.com/Pithikos/python-websocket-server
 
-import asyncio
 import re
 import struct
 from base64 import b64encode
@@ -69,7 +68,7 @@ class WebSocket:
         if len(data) >= 2:
             b1, b2 = data[0], data[1]
 
-        fin    = b1 & Bitmasks.FIN
+        fin = b1 & Bitmasks.FIN
         opcode = b1 & Bitmasks.OPCODE
         masked = b2 & Bitmasks.MASKED
         payload_length = b2 & Bitmasks.PAYLOAD_LEN
@@ -145,7 +144,7 @@ class WebSocket:
         else:
             raise TypeError("Message must be either str or bytes")
 
-        header  = bytearray()
+        header = bytearray()
         payload = message.encode("utf-8")
         payload_length = len(payload)
 
@@ -199,11 +198,11 @@ class WebSocket:
 
     def make_handshake_response(self, key):
         return \
-          'HTTP/1.1 101 Switching Protocols\r\n'\
-          'Upgrade: websocket\r\n'              \
-          'Connection: Upgrade\r\n'             \
-          'Sec-WebSocket-Accept: %s\r\n'        \
-          '\r\n' % self.calculate_response_key(key)
+            'HTTP/1.1 101 Switching Protocols\r\n' \
+            'Upgrade: websocket\r\n' \
+            'Connection: Upgrade\r\n' \
+            'Sec-WebSocket-Accept: %s\r\n' \
+            '\r\n' % self.calculate_response_key(key)
 
     def calculate_response_key(self, key):
         GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
