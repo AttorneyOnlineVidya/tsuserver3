@@ -641,6 +641,10 @@ class AOProtocol(asyncio.Protocol):
             reason = "N/A"
             if self.validate_net_cmd(args, self.ArgType.STR):
                 reason = args[0]
+                if len(reason) > 256:
+                    logger.log_server('[{}] has tried to enter a very long modcall reason.'
+                                      .format(self.client.get_ip(), reason))
+                    return
             self.server.send_all_cmd_pred('ZZ', '[{}] {} ({}) in {} ({}). Reason: {}'
                                           .format(current_time, self.client.get_char_name(), self.client.get_ip(),
                                                   self.client.area.name, self.client.area.id, reason),
