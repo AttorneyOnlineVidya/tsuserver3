@@ -410,13 +410,17 @@ class ClientManager:
                     if value.lower().startswith(client.get_ipreal().lower()):
                         targets.append(client)
                 elif key == TargetType.OOC_NAME:
-                    if value.lower().startswith(client.name.lower()) and client.name:
+                    if value == client.name and client.name:
                         targets.append(client)
                 elif key == TargetType.CHAR_NAME:
-                    if value.lower().startswith(client.get_char_name().lower()):
+                    if value.lower() == client.get_char_name().lower():
                         targets.append(client)
                 elif key == TargetType.ID:
-                    if client.id == value:
+                    try:
+                        int(value)
+                    except AttributeError:
+                        return
+                    if client.id == int(value):
                         targets.append(client)
                 elif key == TargetType.IPID:
                     if client.ipid == value:
