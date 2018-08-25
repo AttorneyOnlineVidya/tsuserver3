@@ -39,6 +39,7 @@ class TsuServer3:
         self.loaded_ips = {}
         self.load_config()
         self.load_iniswaps()
+        self.load_gimps()
         self.client_manager = ClientManager(self)
         self.area_manager = AreaManager(self)
         self.serverpoll_manager = ServerpollManager(self)
@@ -87,6 +88,7 @@ class TsuServer3:
             asyncio.ensure_future(self.ms_client.connect(), loop=loop)
 
         logger.log_debug('Server started.')
+        print("Welcome to AOVserver version " + str(self.release) + "." + str(self.major_version) + "." + str(self.minor_version))
 
         try:
             loop.run_forever()
@@ -132,6 +134,10 @@ class TsuServer3:
             self.config['log_size'] = 1048576
         if 'log_backups' not in self.config:
             self.config['log_backups'] = 5
+
+    def load_gimps(self):
+        with open('config/gimp.yaml', 'r', encoding='utf-8') as cfg:
+            self.gimp_list = yaml.load(cfg)
 
     def load_ids(self):
         self.hdid_list = {}

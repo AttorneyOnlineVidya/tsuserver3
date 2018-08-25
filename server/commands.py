@@ -854,8 +854,11 @@ def ooc_cmd_gimp(client, arg):
             targets = client.server.client_manager.get_targets(client, TargetType.IPID, arg, False)
         elif len(arg) < 12 and arg.isdigit():
             targets = client.server.client_manager.get_targets(client, TargetType.ID, int(arg), False)
+        else:
+            raise ArgumentError()
     except:
         raise ArgumentError('You must specify a target. Use /gimp <id>.')
+        return
     if targets:
         for c in targets:
             logger.log_server('Gimping {}.'.format(c.get_ip(), client))

@@ -400,6 +400,8 @@ class AOProtocol(asyncio.Protocol):
         CT#<name:string>#<message:string>#%
 
         """
+        if self.client.name == '' or self.client.name != args[0]:
+            self.client.name = args[0]
         if self.client.is_ooc_muted:  # Checks to see if the client has been muted by a mod
             self.client.send_host_message("You have been muted by a moderator")
             return
@@ -408,7 +410,7 @@ class AOProtocol(asyncio.Protocol):
         if self.client.name == '':
             self.client.send_host_message('You must insert a name with at least one letter.')
             return
-        if self.client.name.startswith(self.server.config['hostname']) or self.client.name.startswith('<dollar>G'):
+        if self.client.name.startswith(self.server.config['hostname']) or self.client.name.startswith('<dollar>G') or self.client.name.startswith('<dollar>Н'):
             self.client.send_host_message('That name is reserved!')
             return
 

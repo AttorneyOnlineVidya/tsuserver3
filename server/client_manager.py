@@ -17,6 +17,7 @@
 
 import re
 import time
+import random
 from heapq import heappop, heappush
 
 from server import logger
@@ -322,59 +323,7 @@ class ClientManager:
 
         # noinspection PyMethodMayBeStatic
         def gimp_message(self, message):
-            message = ['ERP IS BAN',
-                       'I\'m fucking gimped because I\'m both autistic and a retard!',
-                       'HELP ME',
-                       'Boy, I sure do love Anongrill, the best admin, and the cutest!!!!!',
-                       'Bro is the broiest bro of the bro\'s that bro bro bro bro.',
-                       'GOD DAMN IT LD WE LOST THE FUCKING CUP AGAIN',
-                       'WHAT THE FUCK DOES NAMU EVEN DO',
-                       'I\'M SEVERELY AUTISTIC!!!!',
-                       '[PEES FREELY]',
-                       'KILL ME',
-                       'I found this place on reddit XD',
-                       'how do i redtext?',
-                       'Anyone else a fan of MLP?',
-                       'does this server have sans from undertale?',
-                       'what does call mod do',
-                       'I\'M PICKLE RIIIIIIIIIIICK',
-                       'does anyone have a miiverse account?',
-                       'Drop me a PM if you want to ERP',
-                       'Join my discord server please',
-                       'Add me on steam t. Syntere',
-                       'Civ V when?',
-                       'can I have mod pls?',
-                       'why is everyone a missingo?',
-                       'how 2 change areas?',
-                       'Haha I wonder what Maya\'s feet smell like, just wondering, haha, just as a joke you know? Haha',
-                       'Guys how do I win a case?',
-                       'My win loss ratio as prosecutor is 12:6',
-                       'why, my peanus weenus of course :) hahah! it\'s my weeeeeenus peanus! hahah :)',
-                       'raymond shiled is the mastermind of AAI2',
-                       'does anyone want to check out my tumblr? :3',
-                       '19 years of perfection, i don\'t play games to fucking lose',
-                       'nah... your taunts are fucking useless... only defeat angers me... by trying to taunt just earns you my pitty',
-                       'When do we remove dangits',
-                       'MODS STOP GIMPING ME',
-                       'Please don\'t say things like ni**er and f**k it\'s very rude and I don\'t like it',
-                       'Come back, lewdton.',
-                       'Chiaki is my waifu!',
-                       'PLAY NORMIES PLS',
-                       'omit what I just said I was gimped',
-                       'Fuck off jumbles',
-                       'his head was fuck up',
-                       'yea i lied',
-                       'Cofee knife',
-                       'Hide the rips.',
-                       'Turkey, a favorite of mine',
-                       'case?',
-                       '((Case?))',
-                       '((case?))',
-                       '( ( c a s e ? ) )',
-                       '(((((case????)))))',
-                       '((hello is someone casing here?))',
-                       '((pardon me, i might have just interrupted but is there a case going on in this area?))',
-                       '((status?))']
+            message = self.server.gimp_list
             return random.choice(message)
 
     def __init__(self, server):
@@ -410,10 +359,10 @@ class ClientManager:
                     if value.lower().startswith(client.get_ipreal().lower()):
                         targets.append(client)
                 elif key == TargetType.OOC_NAME:
-                    if value.lower().startswith(client.name.lower()) and client.name:
+                    if value.lower() == client.name.lower() and client.name:
                         targets.append(client)
                 elif key == TargetType.CHAR_NAME:
-                    if value.lower().startswith(client.get_char_name().lower()):
+                    if value.lower() == client.get_char_name().lower():
                         targets.append(client)
                 elif key == TargetType.ID:
                     if client.id == value:
