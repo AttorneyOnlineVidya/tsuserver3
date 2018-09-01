@@ -70,7 +70,7 @@ def ooc_cmd_bglock(client, arg):
     else:
         client.area.bg_lock = "true"
     client.area.send_host_message('A mod has set the background lock to {}.'.format(client.area.bg_lock))
-    logger.log_server(
+    logger.log_mod(
         '[{}][{}]Changed bglock to {}'.format(client.area.id, client.get_char_name(), client.area.bg_lock), client)
 
 
@@ -170,8 +170,6 @@ def ooc_cmd_currentmusic(client, arg):
         raise ClientError('There is no music currently playing.')
     client.send_host_message('The current music is {} and was played by {}.'.format(client.area.current_music,
                                                                                     client.area.current_music_player))
-
-
 def ooc_cmd_coinflip(client, arg):
     if len(arg) != 0:
         raise ArgumentError('This command has no arguments.')
@@ -181,12 +179,10 @@ def ooc_cmd_coinflip(client, arg):
     logger.log_server(
         '[{}][{}]Used /coinflip and got {}.'.format(client.area.id, client.get_char_name(), flip))
 
-
 def ooc_cmd_motd(client, arg):
     if len(arg) != 0:
         raise ArgumentError("This command doesn't take any arguments")
     client.send_motd()
-
 
 def ooc_cmd_pos(client, arg):
     if len(arg) == 0:
@@ -204,15 +200,11 @@ def ooc_cmd_pos(client, arg):
 def ooc_cmd_forcepos(client, arg):
     if not client.is_cm and not client.is_mod:
         raise ClientError('You must be authorized to do that.')
-
     args = arg.split()
-
     if len(args) < 1:
         raise ArgumentError(
             'Not enough arguments. Use /forcepos <pos> <target>. Target should be ID, OOC-name or char-name. Use /getarea for getting info like "[ID] char-name".')
-
     targets = []
-
     pos = args[0]
     if len(args) > 1:
         targets = client.server.client_manager.get_targets(
@@ -239,8 +231,8 @@ def ooc_cmd_forcepos(client, arg):
 
     client.area.send_host_message(
         '{} forced {} client(s) into /pos {}.'.format(client.get_char_name(), len(targets), pos))
-    logger.log_server(
-        '[{}][{}]Used /forcepos {} for {} client(s).'.format(client.area.id, client.get_char_name(), pos, len(targets)))
+    logger.log_mod(
+        '[{}][{}]Used /forcepos {} for {} client(s).'.format(client.area.id, client.get_char_name(), pos, len(targets)), client)
 
 
 def ooc_cmd_help(client, arg):
@@ -277,7 +269,9 @@ def ooc_cmd_kick(client, arg):
             logger.log_server('Kicked {}.'.format(c.ipid), client)
             client.send_host_message("{} was kicked.".format(c.get_char_name()))
             c.disconnect()
-
+        logger.log_mod(
+                '[{}][{}] kicked {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
+                                                                  ''.join(args[1:]).strip(), len(kicklist)), client)
 
 def ooc_cmd_ban(client, arg):
     if not client.is_mod:
@@ -309,7 +303,9 @@ def ooc_cmd_ban(client, arg):
             c.disconnect()
         client.send_host_message('{} clients were kicked.'.format(len(banlist)))
         client.send_host_message('{} was banned.'.format(ban))
-        logger.log_server('Banned {}.'.format(ban), client)
+        logger.log_mod(
+                '[{}][{}] banned {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
+                                                                  ''.join(args[1:]).strip(), len(banlist)), client)
     else:
         client.send_host_message('No targets found.')
 
@@ -319,10 +315,11 @@ def ooc_cmd_unban(client, arg):
         raise ClientError('You must be authorized to do that.')
     try:
         client.server.ban_manager.remove_ban(client, arg)
-    except Exception as E:
-        print(E)
+    except:
         raise ClientError('Must be IP or IPID, or client already unbanned.')
-    logger.log_server('Unbanned {}.'.format(arg), client)
+    logger.log_mod(
+        '[{}][{}] unbanned {}.'.format(client.area.id, client.get_char_name(), arg),
+        client)
     client.send_host_message('Unbanned {}'.format(arg))
 
 
@@ -336,7 +333,7 @@ def ooc_cmd_play(client, arg):
         raise ArgumentError('You can only play songs from the music folder.')
     client.area.play_music(arg, client.char_id, -1)
     client.area.add_music_playing(client, arg)
-    logger.log_server('[{}][{}]Changed music to {}.'.format(client.area.id, client.get_char_name(), arg), client)
+    logger.log_mod('[{}][{}]Changed music to {}.'.format(client.area.id, client.get_char_name(), arg), client)
 
 
 def ooc_cmd_mute(client, arg):
@@ -371,6 +368,9 @@ def ooc_cmd_mute(client, arg):
                     mod_num += 1
                 else:
                     c.is_muted = True
+                    logger.log_mod(
+                    '[{}][{}] muted {} [{}].'.format(client.area.id, client.get_char_name(), c.ipid, c.get_char_name()),
+                        client)
             client.send_host_message('Muted {} existing client(s).'.format(len(mutelist) - mod_num))
         except:
             client.send_host_message(
@@ -411,10 +411,13 @@ def ooc_cmd_unmute(client, arg):
                     mod_num += 1
                 else:
                     c.is_muted = False
+                    logger.log_mod(
+                    '[{}][{}] unmuted {} [{}].'.format(client.area.id, client.get_char_name(), c.ipid, c.get_char_name()),
+                        client)
             client.send_host_message('Unmuted {} existing client(s).'.format(len(mutelist) - mod_num))
         except:
             client.send_host_message(
-                "No targets found. Use /unmute [\'ip\',\'ipid\', \'hdid\', \'id\',\'char\', \'ooc\'] [\'value\'] or /unmute all")
+                "No targets found. Use /unmute [\'ip\',\'ipid\', \'hdid\', \'id\',\'char\', \'ooc\'] [\ 'value\'] or /unmute all")
     else:
         client.send_host_message('No targets found.')
 
@@ -429,7 +432,7 @@ def ooc_cmd_login(client, arg):
     if client.area.evidence_mod == 'HiddenCM':
         client.area.broadcast_evidence_list()
     client.send_host_message('Logged in as a moderator.')
-    logger.log_server('Logged in as moderator.', client)
+    logger.log_mod('[{}][{}] Logged in as moderator.'.format(client.area.id, client.get_char_name() ), client)
 
 
 def ooc_cmd_g(client, arg):
@@ -450,6 +453,7 @@ def ooc_cmd_gm(client, arg):
         raise ArgumentError("Can't send an empty message.")
     client.server.broadcast_global(client, arg, True)
     logger.log_server('[{}][{}][GLOBAL-MOD]{}.'.format(client.area.id, client.get_char_name(), arg), client)
+    logger.log_mod('[{}][{}][GLOBAL-MOD]{}.'.format(client.area.id, client.get_char_name(), arg), client)
 
 
 def ooc_cmd_lm(client, arg):
@@ -460,6 +464,7 @@ def ooc_cmd_lm(client, arg):
     client.area.send_command('CT', '{}[MOD][{}]'
                              .format(client.server.config['hostname'], client.get_char_name()), arg)
     logger.log_server('[{}][{}][LOCAL-MOD]{}.'.format(client.area.id, client.get_char_name(), arg), client)
+    logger.log_mod('[{}][{}][LOCAL-MOD]{}.'.format(client.area.id, client.get_char_name(), arg), client)
 
 
 def ooc_cmd_announce(client, arg):
@@ -598,6 +603,8 @@ def ooc_cmd_pm(client, arg):
             client.send_host_message('Target(s) not receiving PMs because of mute.')
         else:
             client.send_host_message('PM sent to {}, {} user(s). Message: {}'.format(namedrop, sent_num, msg))
+            logger.log_server('[{}][{}] sent a PM to {}: {}.'.format(client.area.id, client.get_char_name(), namedrop, msg)
+                              , client)
 
 
 def ooc_cmd_mutepm(client, arg):
@@ -613,8 +620,13 @@ def ooc_cmd_charselect(client, arg):
     else:
         if client.is_mod:
             try:
-                client.server.client_manager.get_targets(client, TargetType.ID, int(arg), False)[0].char_select()
-            except:
+                target = client.server.client_manager.get_targets(client, TargetType.ID, int(arg), False)
+                logger.log_mod('[{}][{}] forced charselect to {} [{}].'.format(client.area.id, client.get_char_name(),
+                                                                               target[0].get_ip(),
+                                                                               target[0].get_char_name()), client)
+                target[0].char_select()
+            except Exception as E:
+                print(E)
                 raise ArgumentError('Wrong arguments. Use /charselect <target\'s id>')
 
 
@@ -651,8 +663,10 @@ def ooc_cmd_getareas(client, arg):
 
 
 def ooc_cmd_mods(client, arg):
-    client.send_area_info(-1, True)
-
+    try:
+        client.area.send_host_message("There are {} mods in the area.".format(len(client.area.get_mods())))
+    except Exception as E:
+        print(E)
 
 def ooc_cmd_evi_swap(client, arg):
     args = list(arg.split(' '))
@@ -681,6 +695,8 @@ def ooc_cmd_logout(client, arg):
     if client.area.evidence_mod == 'HiddenCM':
         client.area.broadcast_evidence_list()
     client.send_host_message('you\'re not a mod now')
+    logger.log_mod('[{}][{}] logged out of modship.'.format(client.area.id, client.get_char_name())
+                              , client)
 
 
 def ooc_cmd_area_lock(client, arg):
@@ -819,7 +835,8 @@ def ooc_cmd_disemvowel(client, arg):
         raise ArgumentError('You must specify a target. Use /disemvowel <id>.')
     if targets:
         for c in targets:
-            logger.log_server('Disemvowelling {}.'.format(c.get_ip()), client)
+            logger.log_mod('[{}][{}] disemvowelled {} [{}].'.format(client.area.id, client.get_char_name(), c.get_ip(),
+                                                                     c.get_char_name()), client)
             c.disemvowel = True
         client.send_host_message('Disemvowelled {} existing client(s).'.format(len(targets)))
     else:
@@ -837,7 +854,8 @@ def ooc_cmd_undisemvowel(client, arg):
         raise ArgumentError('You must specify a target. Use /disemvowel <id>.')
     if targets:
         for c in targets:
-            logger.log_server('Undisemvowelling {}.'.format(c.get_ip()), client)
+            logger.log_mod('[{}][{}] undisemvowelled {} [{}].'.format(client.area.id, client.get_char_name(), c.get_ip(),
+                                                                     c.get_char_name()), client)
             c.disemvowel = False
         client.send_host_message('Undisemvowelled {} existing client(s).'.format(len(targets)))
     else:
@@ -857,11 +875,12 @@ def ooc_cmd_gimp(client, arg):
         else:
             raise ArgumentError()
     except:
-        raise ArgumentError('You must specify a target. Use /gimp <id>.')
+        raise ArgumentError('You must specify a target. Use /gimp <id> or <ipid>.')
         return
     if targets:
         for c in targets:
-            logger.log_server('Gimping {}.'.format(c.get_ip(), client))
+            logger.log_mod('[{}][{}] gimped {} [{}].'.format(client.area.id, client.get_char_name(), c.get_ip(),
+                                                                     c.get_char_name()), client)
             c.gimp = True
         client.send_host_message('Gimped {} targets.'.format(len(targets)))
     else:
@@ -882,7 +901,8 @@ def ooc_cmd_ungimp(client, arg):
         raise ArgumentError('You must specify a target. Use /gimp <id>.')
     if targets:
         for c in targets:
-            logger.log_server('Ungimping {}.'.format(c.get_ip(), client))
+            logger.log_mod('[{}][{}] ungimped {} [{}].'.format(client.area.id, client.get_char_name(), c.get_ip(),
+                                                                     c.get_char_name()), client)
             c.gimp = False
         client.send_host_message('Ungimped {} targets.'.format(len(targets)))
     else:
@@ -903,7 +923,9 @@ def ooc_cmd_blockdj(client, arg):
     for target in targets:
         target.is_dj = False
         target.send_host_message('A moderator muted you from changing the music.')
-    client.send_host_message('blockdj\'d {}.'.format(targets[0].get_char_name()))
+        logger.log_mod('[{}][{}] blocked {} [{}] from changing music.'.format(client.area.id, client.get_char_name(),
+                        target.get_ip(), target.get_char_name()), client)
+    client.send_host_message('You blocked {} from changing the music.'.format(targets[0].get_char_name()))
 
 
 def ooc_cmd_unblockdj(client, arg):
@@ -920,7 +942,9 @@ def ooc_cmd_unblockdj(client, arg):
     for target in targets:
         target.is_dj = True
         target.send_host_message('A moderator unmuted you from changing the music.')
-    client.send_host_message('Unblockdj\'d {}.'.format(targets[0].get_char_name()))
+        logger.log_mod('[{}][{}] unblocked {} [{}] from changing music.'.format(client.area.id, client.get_char_name(),
+                        target.get_ip(), target.get_char_name()), client)
+    client.send_host_message('You unblocked {} from changing the music.'.format(targets[0].get_char_name()))
 
 
 def ooc_cmd_blockwtce(client, arg):
@@ -937,7 +961,9 @@ def ooc_cmd_blockwtce(client, arg):
     for target in targets:
         target.can_wtce = False
         target.send_host_message('A moderator blocked you from using judge signs.')
-    client.send_host_message('blockwtce\'d {}.'.format(targets[0].get_char_name()))
+        logger.log_mod('[{}][{}] blocked {} [{}] from using judge signs.'.format(client.area.id, client.get_char_name(),
+                        target.get_ip(), target.get_char_name()), client)
+    client.send_host_message('You blocked {} from using the WT/CE buttons.'.format(targets[0].get_char_name()))
 
 
 def ooc_cmd_unblockwtce(client, arg):
@@ -954,7 +980,9 @@ def ooc_cmd_unblockwtce(client, arg):
     for target in targets:
         target.can_wtce = True
         target.send_host_message('A moderator unblocked you from using judge signs.')
-    client.send_host_message('unblockwtce\'d {}.'.format(targets[0].get_char_name()))
+        logger.log_mod('[{}][{}] blocked {} [{}] from using judge signs.'.format(client.area.id, client.get_char_name(),
+                        target.get_ip(), target.get_char_name()), client)
+    client.send_host_message('You unblocked {} from using the WT/CE buttons. {}.'.format(targets[0].get_char_name()))
 
 
 def ooc_cmd_vote(client, arg):
@@ -991,6 +1019,8 @@ def ooc_cmd_pollset(client, arg):
     if client.is_mod:
         client.server.serverpoll_manager.add_poll(arg)
         client.send_host_message('Added {} as a poll.'.format(arg))
+        logger.log_mod('[{}][{}] added {} as a poll.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
     else:
         return
 
@@ -999,6 +1029,8 @@ def ooc_cmd_pollremove(client, arg):
     if client.is_mod:
         client.server.serverpoll_manager.remove_poll(arg)
         client.send_host_message('Removed {} as a poll.'.format(arg))
+        logger.log_mod('[{}][{}] removed {} as a poll.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
     else:
         return
 
@@ -1027,6 +1059,8 @@ def ooc_cmd_addpolldetail(client, arg):
             x = client.server.serverpoll_manager.polldetail(poll_name, detail)
             if x == 1:
                 client.send_host_message('Added "{}" as details in poll "{}"'.format(detail, poll_name))
+                logger.log_mod('[{}][{}] detail to poll {}.'.format(client.area.id, client.get_char_name(),
+                                                                     poll_name), client)
             else:
                 client.send_host_message('Poll does not exist!')
     else:
@@ -1046,12 +1080,14 @@ def ooc_cmd_setupdate(client, arg):
         client.server.data['update'] = arg
         client.server.save_data()
         client.send_host_message('Update set!')
+        logger.log_mod('[{}][{}] set the update to {}.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
 
 
 def ooc_cmd_update(client, arg):
     try:
         client.send_host_message('Latest Update: {}'.format(client.server.data['update']))
-    except ServerErrorr:
+    except ServerError:
         client.send_host_message('Update not set!')
 
 
@@ -1060,6 +1096,8 @@ def ooc_cmd_setthread(client, arg):
         client.server.data['thread'] = arg
         client.server.save_data()
         client.send_host_message('Thread set!')
+        logger.log_mod('[{}][{}] set the thread to {}.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
 
 
 def ooc_cmd_thread(client, arg):
@@ -1094,48 +1132,6 @@ def ooc_cmd_notecard_reveal(client, arg):
         msg += '{}: {}\n'.format(card_owner, card_msg)
     client.area.cards.clear()
     client.area.send_host_message(msg)
-
-
-def ooc_cmd_rolla_reload(client, arg):
-    if not client.is_mod:
-        raise ClientError('You must be a moderator to load the ability dice configuration.')
-    rolla_reload(client.area)
-    client.send_host_message('Reloaded ability dice configuration.')
-
-
-def rolla_reload(area):
-    try:
-        import yaml
-        with open('config/dice.yaml', 'r') as dice:
-            area.ability_dice = yaml.load(dice)
-    except:
-        raise ServerError('There was an error parsing the ability dice configuration. Check your syntax.')
-
-
-def ooc_cmd_rolla_set(client, arg):
-    if not hasattr(client.area, 'ability_dice'):
-        rolla_reload(client.area)
-    available_sets = client.area.ability_dice.keys()
-    if len(arg) == 0:
-        raise ArgumentError('You must specify the ability set name.\nAvailable sets: {}'.format(available_sets))
-    if arg in client.area.ability_dice:
-        client.ability_dice_set = arg
-        client.send_host_message("Set ability set to {}.".format(arg))
-    else:
-        raise ArgumentError('Invalid ability set \'{}\'.\nAvailable sets: {}'.format(arg, available_sets))
-
-
-def ooc_cmd_rolla(client, arg):
-    if not hasattr(client.area, 'ability_dice'):
-        rolla_reload(client.area)
-    if not hasattr(client, 'ability_dice_set'):
-        raise ClientError('You must set your ability set using /rolla_set <name>.')
-    ability_dice = client.area.ability_dice[client.ability_dice_set]
-    max_roll = ability_dice['max'] if 'max' in ability_dice else 6
-    roll = random.randint(1, max_roll)
-    ability = ability_dice[roll] if roll in ability_dice else "Nothing happens"
-    client.area.send_host_message(
-        '{} rolled a {} (out of {}): {}.'.format(client.get_char_name(), roll, max_roll, ability))
 
 
 def ooc_cmd_refresh(client, arg):
@@ -1180,6 +1176,8 @@ def ooc_cmd_pollchoiceclear(client, arg):
     if client.is_mod:
         client.server.serverpoll_manager.clear_poll_choice(arg)
         client.send_host_message('Poll {} choices cleared.'.format(arg))
+        logger.log_mod('[{}][{}] cleared poll {} choices.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
     else:
         return
 
@@ -1205,6 +1203,8 @@ def ooc_cmd_pollchoiceremove(client, arg):
             return
         client.send_host_message(
             'Removed {} as a choice in poll {}. Current choices:\n{} '.format(choice, poll, "\n".join(x)))
+        logger.log_mod('[{}][{}] removed {} as a choice in poll {}.'.format(client.area.id, client.get_char_name(),
+                        choice, poll), client)
     else:
         return
 
@@ -1230,6 +1230,8 @@ def ooc_cmd_pollchoiceadd(client, arg):
             return
         client.send_host_message(
             'Added {} as a choice in poll {}. Current choices:\n{} '.format(choice, poll, "\n".join(x)))
+        logger.log_mod('[{}][{}] added {} as a choice in poll {}.'.format(client.area.id, client.get_char_name(),
+                        choice, poll), client)
     else:
         return
 
@@ -1239,7 +1241,11 @@ def ooc_cmd_makepollmulti(client, arg):
         x = client.server.serverpoll_manager.make_multipoll(arg)
         if x:
             client.send_host_message('Poll {} made multipoll.'.format(arg))
+            logger.log_mod('[{}][{}] made poll {} a multipoll.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
         else:
             client.send_host_message('Poll {} made single poll.'.format(arg))
+            logger.log_mod('[{}][{}] made poll {} a singlepoll.'.format(client.area.id, client.get_char_name(),
+                        arg), client)
     else:
         return

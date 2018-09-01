@@ -169,6 +169,13 @@ class AreaManager:
             for client in self.clients:
                 client.send_command('LE', *self.get_evidence_list(client))
 
+        def get_mods(self):
+            mods = []
+            for client in self.clients:
+                if client.is_mod:
+                    mods.append(client)
+            return mods
+
     def __init__(self, server):
         self.server = server
         self.cur_id = 0

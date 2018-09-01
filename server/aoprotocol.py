@@ -393,6 +393,9 @@ class AOProtocol(asyncio.Protocol):
                                       sfx_delay, button, self.client.evi_list[evidence], flip, ding, color)
         self.client.area.set_next_msg_delay(len(msg))
         logger.log_server('[IC][{}][{}]{}'.format(self.client.area.id, self.client.get_char_name(), msg), self.client)
+        if color == 2:
+            logger.log_mod('[IC][Redtext][{}][{}][{}]{}'.format(self.client.area.id, self.client.area.status,
+                                                                self.client.get_char_name(), msg), self.client)
 
     def net_cmd_ct(self, args):
         """ OOC Message

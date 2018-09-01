@@ -17,11 +17,12 @@
 
 import logging
 import logging.handlers
+from server import area_manager
 
 import time
 
 
-def setup_logger(debug, log_size, log_backups):
+def setup_logger(debug, log_size, log_backups, areas):
     logging.Formatter.converter = time.gmtime
     debug_formatter = logging.Formatter('[%(asctime)s UTC]%(message)s')
     srv_formatter = logging.Formatter('[%(asctime)s UTC]%(message)s')
@@ -49,6 +50,24 @@ def setup_logger(debug, log_size, log_backups):
     server_handler.setFormatter(srv_formatter)
     server_log.addHandler(server_handler)
 
+    mod_log = logging.getLogger('mod')
+    mod_log.setLevel(logging.INFO)
+
+    mod_handler = logging.handlers.RotatingFileHandler('logs/mod.log', maxBytes=log_size, backupCount=log_backups,
+                                                          encoding='utf-8')
+    mod_handler.setLevel(logging.INFO)
+    mod_handler.setFormatter(srv_formatter)
+    mod_log.addHandler(mod_handler)
+
+    user_log = logging.getLogger('user')
+    user_log.setLevel(logging.INFO)
+
+    user_handler = logging.handlers.RotatingFileHandler('logs/user.log', maxBytes=log_size, backupCount=log_backups,
+                                                       encoding='utf-8')
+    user_handler.setLevel(logging.INFO)
+    user_handler.setFormatter(srv_formatter)
+    user_log.addHandler(user_handler)
+
     serverpoll_log = logging.getLogger('serverpoll')
     serverpoll_log.setLevel(logging.INFO)
     serverpoll_handler = logging.FileHandler('logs/serverpoll.log', encoding='utf-8')
@@ -56,6 +75,18 @@ def setup_logger(debug, log_size, log_backups):
     serverpoll_handler.setFormatter(srv_formatter)
     serverpoll_log.addHandler(serverpoll_handler)
 
+    area_logs = []
+    area_handler = []
+    i = 0
+    for area in areas:
+        area_logs.append(logging.getLogger(area.name))
+        area_logs[i].setLevel(logging.INFO)
+        area_handler.append(logging.handlers.RotatingFileHandler('logs/area/'+ area.name + '.log', maxBytes=log_size, backupCount=log_backups,
+                                                           encoding='utf-8'))
+        area_handler[i].setLevel(logging.INFO)
+        area_handler[i].setFormatter(srv_formatter)
+        area_logs[i].addHandler(area_handler[i])
+        i += 1
 
 def log_debug(msg, client=None):
     msg = parse_client_info(client) + msg
@@ -64,8 +95,16 @@ def log_debug(msg, client=None):
 
 def log_server(msg, client=None):
     msg = parse_client_info(client) + msg
+    if client:
+        logging.getLogger(client.area.name).info(msg)
+    logging.getLogger('user').info(msg)
     logging.getLogger('server').info(msg)
 
+
+def log_mod(msg, client=None):
+    msg = parse_client_info(client) + msg
+    logging.getLogger('mod').info(msg)
+    logging.getLogger('server').info(msg)
 
 def log_serverpoll(msg, client=None):
     msg = parse_client_info(client) + msg
