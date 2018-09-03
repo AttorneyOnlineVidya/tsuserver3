@@ -664,7 +664,7 @@ def ooc_cmd_getareas(client, arg):
 
 def ooc_cmd_mods(client, arg):
     try:
-        client.area.send_host_message("There are {} mods in the area.".format(len(client.area.get_mods())))
+        client.send_host_message("There are {} mods online, and {} mods in the area.".format(len(client.get_mods()),len(client.area.get_mods())))
     except Exception as E:
         print(E)
 
