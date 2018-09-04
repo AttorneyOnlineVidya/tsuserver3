@@ -211,3 +211,9 @@ class AreaManager:
             if area.id == num:
                 return area
         raise AreaError('Area not found.')
+
+    def mods_online(self):
+        num = 0
+        for area in self.areas:
+            num += len(area.get_mods())
+        return num

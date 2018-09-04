@@ -17,6 +17,7 @@
 
 import logging
 import logging.handlers
+import os
 from server import area_manager
 
 import time
@@ -78,6 +79,8 @@ def setup_logger(debug, log_size, log_backups, areas):
     area_logs = []
     area_handler = []
     i = 0
+    if not os.path.exists('logs/area/'):
+        os.makedirs('logs/area/')
     for area in areas:
         area_logs.append(logging.getLogger(area.name))
         area_logs[i].setLevel(logging.INFO)
@@ -116,5 +119,5 @@ def parse_client_info(client):
         return ''
     info = client.get_ipreal()
     if client.is_mod:
-        return '[{:<15}][{}][MOD]'.format(info, client.id)
-    return '[{:<15}][{}]'.format(info, client.id)
+        return '[{:<15}][{}][{}][MOD]'.format(info, client.ipid, client.id)
+    return '[{:<15}][{}][{}]'.format(info, client.ipid, client.id)
