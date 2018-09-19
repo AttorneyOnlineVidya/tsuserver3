@@ -174,8 +174,9 @@ class AOProtocol(asyncio.Protocol):
         for ip_id in self.client.server.hdid_list[self.client.hdid]:
             if self.server.ban_manager.is_banned(ip_id):
                 self.client.disconnect()
+                logger.log_connect('Connection rejected, Banned. HDID: {}'.format(self.client.ipid, self.client.hdid), self.client)
                 return
-        logger.log_server('Connected. HDID: {}.'.format(self.client.hdid), self.client)
+        logger.log_connect('Connected. HDID: {}.'.format(self.client.hdid), self.client)
         self.client.send_command('ID', self.client.id, self.server.software, self.server.get_version_string())
         self.client.send_command('PN', self.server.get_player_count() - 1, self.server.config['playerlimit'])
 

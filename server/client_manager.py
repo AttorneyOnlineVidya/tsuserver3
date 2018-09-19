@@ -365,8 +365,11 @@ class ClientManager:
                     if value.lower() == client.get_char_name().lower():
                         targets.append(client)
                 elif key == TargetType.ID:
-                    if client.id == value:
-                        targets.append(client)
+                    try:
+                        if client.id == int(value):
+                            targets.append(client)
+                    except(ValueError):
+                        pass
                 elif key == TargetType.IPID:
                     if client.ipid == value:
                         targets.append(client)

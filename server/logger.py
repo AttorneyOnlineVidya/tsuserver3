@@ -69,6 +69,13 @@ def setup_logger(debug, log_size, log_backups, areas):
     user_handler.setFormatter(srv_formatter)
     user_log.addHandler(user_handler)
 
+    connection_log = logging.getLogger('connect')
+    connection_log.setLevel(logging.INFO)
+    connection_handler = logging.FileHandler('logs/connection.log', encoding='utf-8')
+    connection_handler.setLevel(logging.INFO)
+    connection_handler.setFormatter(srv_formatter)
+    connection_log.addHandler(connection_handler)
+
     serverpoll_log = logging.getLogger('serverpoll')
     serverpoll_log.setLevel(logging.INFO)
     serverpoll_handler = logging.FileHandler('logs/serverpoll.log', encoding='utf-8')
@@ -113,6 +120,10 @@ def log_serverpoll(msg, client=None):
     msg = parse_client_info(client) + msg
     logging.getLogger('serverpoll').info(msg)
 
+def log_connect(msg, client=None):
+    msg = parse_client_info(client) + msg
+    logging.getLogger('connect').info(msg)
+    logging.getLogger('server').info(msg)
 
 def parse_client_info(client):
     if client is None:

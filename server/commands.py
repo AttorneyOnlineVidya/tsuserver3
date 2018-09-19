@@ -263,7 +263,6 @@ def ooc_cmd_kick(client, arg):
         kicklist = client.server.client_manager.get_targets(client, TargetType.CHAR_NAME, ' '.join(args[1:]), True)
     elif args[0].lower() == 'ooc':
         kicklist = client.server.client_manager.get_targets(client, TargetType.OOC_NAME, ' '.join(args[1:]), True)
-    print(kicklist)
     if kicklist:
         for c in kicklist:
             logger.log_server('Kicked {}.'.format(c.ipid), client)
@@ -272,6 +271,8 @@ def ooc_cmd_kick(client, arg):
         logger.log_mod(
                 '[{}][{}] kicked {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
                                                                   ''.join(args[1:]).strip(), len(kicklist)), client)
+    else:
+        client.send_host_message("No targets found.")
 
 def ooc_cmd_ban(client, arg):
     if not client.is_mod:
@@ -626,7 +627,6 @@ def ooc_cmd_charselect(client, arg):
                                                                                target[0].get_char_name()), client)
                 target[0].char_select()
             except Exception as E:
-                print(E)
                 raise ArgumentError('Wrong arguments. Use /charselect <target\'s id>')
 
 
