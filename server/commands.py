@@ -271,6 +271,7 @@ def ooc_cmd_kick(client, arg):
         logger.log_mod(
                 '[{}][{}] kicked {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
                                                                   ''.join(args[1:]).strip(), len(kicklist)), client)
+        client.server.stats_manager.kicked_user(c.ipid)
     else:
         client.send_host_message("No targets found.")
 
@@ -289,13 +290,20 @@ def ooc_cmd_ban(client, arg):
         banlist = client.server.client_manager.get_targets(client, TargetType.HDID, ''.join(args[1:]).strip(), False)
     elif args[0].lower() == 'id':
         banlist = client.server.client_manager.get_targets(client, TargetType.ID, ''.join(args[1:]).strip(), False)
-    if banlist or args[0].lower() == 'ip':
+    if banlist or args[0].lower() == 'ip' or args[0].lower() == 'ipid':
         try:
             ban = banlist[0].ipid
             actual = ban
         except IndexError:
-            ban = ''.join(args[1:]).strip()
-            actual = client.server.get_ipid(ban)
+            if args[0].lower() == 'ip':
+                ban = ''.join(args[1:]).strip()
+                actual = client.server.get_ipid(ban)
+            if args[0].lower() == 'ipid':
+                if len(''.join(args[1:]).strip()) != 12:
+                    client.send_host_message("Invalid IPID.")
+                    return
+                ban = ''.join(args[1:]).strip()
+                actual = ban
         try:
             client.server.ban_manager.add_ban(actual)
         except ServerError:
@@ -307,6 +315,10 @@ def ooc_cmd_ban(client, arg):
         logger.log_mod(
                 '[{}][{}] banned {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
                                                                   ''.join(args[1:]).strip(), len(banlist)), client)
+        if args[0].lower() == 'ipid' or args[0].lower() == 'ip':
+            client.server.stats_manager.banned_user(actual)
+        else:
+            client.server.stats_manager.banned_user(c.ipid)
     else:
         client.send_host_message('No targets found.')
 
@@ -372,6 +384,7 @@ def ooc_cmd_mute(client, arg):
                     logger.log_mod(
                     '[{}][{}] muted {} [{}].'.format(client.area.id, client.get_char_name(), c.ipid, c.get_char_name()),
                         client)
+                    client.server.stats_manager.muted_user(c.ipid)
             client.send_host_message('Muted {} existing client(s).'.format(len(mutelist) - mod_num))
         except:
             client.send_host_message(
@@ -512,6 +525,7 @@ def ooc_cmd_doc(client, arg):
         client.send_host_message('Document: {}'.format(client.area.doc))
         logger.log_server(
             '[{}][{}]Requested document. Link: {}'.format(client.area.id, client.get_char_name(), client.area.doc))
+        client.server.stats_manager.user_doc(client.ipid)
     else:
         client.area.change_doc(arg)
         client.area.send_host_message('{} changed the doc link.'.format(client.get_char_name()))
@@ -1249,5 +1263,20 @@ def ooc_cmd_makepollmulti(client, arg):
             client.send_host_message('Poll {} made single poll.'.format(arg))
             logger.log_mod('[{}][{}] made poll {} a singlepoll.'.format(client.area.id, client.get_char_name(),
                         arg), client)
+    else:
+        return
+
+def ooc_cmd_lastchar(client, arg):
+    if client.is_mod:
+        try:
+            cid = client.server.get_char_id_by_name(arg)
+        except ServerError:
+            raise
+        try:
+            ex = client.area.shadow_status[cid]
+        except KeyError:
+            client.send_host_message("Character hasn't been occupied in area since server start.")
+            return
+        client.send_host_message('Last person on {}: IPID: {}, HDID: {}.'.format(arg, ex[0], ex[1]))
     else:
         return

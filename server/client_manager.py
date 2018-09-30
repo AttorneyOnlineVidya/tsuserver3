@@ -105,7 +105,6 @@ class ClientManager:
             if not name_ws or name_ws.isdigit():
                 return False
             for client in self.server.client_manager.clients:
-                print(client.name == name)
                 if client.name == name:
                     return False
             return True
@@ -129,6 +128,7 @@ class ClientManager:
             self.send_command('PV', self.id, 'CID', self.char_id)
             logger.log_server('[{}]Changed character from {} to {}.'
                               .format(self.area.id, old_char, self.get_char_name()), self)
+            self.area.shadow_status[self.char_id] = [self.ipid, self.hdid]
 
         def change_music_cd(self):
             if self.is_mod or self.is_cm:
@@ -197,6 +197,7 @@ class ClientManager:
             logger.log_server(
                 '[{}]Changed area from {} ({}) to {} ({}).'.format(self.get_char_name(), old_area.name, old_area.id,
                                                                    self.area.name, self.area.id), self)
+            self.area.shadow_status[self.char_id] = [self.ipid, self.hdid]
             self.send_command('HP', 1, self.area.hp_def)
             self.send_command('HP', 2, self.area.hp_pro)
             self.send_command('BN', self.area.background)

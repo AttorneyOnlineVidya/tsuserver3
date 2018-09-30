@@ -253,6 +253,7 @@ class ServerpollManager:
 
     def add_vote(self, value, vote, client):
         tmp = time.strftime('%y-%m-%d %H:%M:%S')
+        data_c = self.server.stats_manager.user_data[client.ipid]
         try:
             # Open that shit up and extract the important parts.
             poll_voting = []
@@ -271,7 +272,9 @@ class ServerpollManager:
                 # Now to log their failed vote
                 self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
                                       "{} ({}) at area {}".format(client.name, client.get_char_name(),
-                                                                  client.area.name)],)
+                                                                  client.area.name),
+                                      "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
+                                                                                                                , data_c.data["times_doc"])],)
                 self.write_votelist(poll_voting)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' failed by {} ({}) in {}, with IP {} and HDID {}, at {}. Reason: Already voted.'.format(
@@ -282,7 +285,9 @@ class ServerpollManager:
                   ((item[1] == client.ipid or item[2] == client.hdid) and (item[3].lower() == vote.lower()))]:
                 self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
                                       "{} ({}) at area {}".format(client.name, client.get_char_name(),
-                                                                  client.area.name)],)
+                                                                  client.area.name),
+                                      "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
+                                                                                                                , data_c.data["times_doc"])],)
                 self.write_votelist(poll_voting)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' failed by {} ({}) in {}, with IP {} and HDID {}, at {}. Reason: Already voted.'.format(
@@ -296,8 +301,11 @@ class ServerpollManager:
                 tmp = time.strftime('%y-%m-%d %H:%M:%S')
                 self.vote['log'] += ([tmp, client.ipid, client.hdid, vote,
                                       "{} ({}) at area {}".format(client.name, client.get_char_name(),
-                                                                  client.area.name)],)
+                                                                  client.area.name),
+                                      "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
+                                                                                                                , data_c.data["times_doc"])],)
                 self.write_votelist(poll_voting)
+                self.server.stats_manager.user_voted(client.ipid)
                 logger.log_serverpoll(
                     'Vote in poll {} \'{}\' added succesfully by {} ({}) in {}, with IP {} and HDID {}, at {}.'.format(
                         poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid,
@@ -316,9 +324,13 @@ class ServerpollManager:
                 self.vote['votes'][vote.lower()] += 1
             tmp = time.strftime('%y-%m-%d %H:%M:%S')
             self.vote['log'] += ([tmp, client.ipid, client.hdid, vote,
-                                  "{} ({}) at area {}".format(client.name, client.get_char_name(), client.area.name)],)
+                                  "{} ({}) at area {}".format(client.name, client.get_char_name(), client.area.name),
+                                      "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
+                                                                                                                , data_c.data["times_doc"])],)
             self.write_votelist(poll_voting)
+            self.server.stats_manager.user_voted(client.ipid)
             logger.log_serverpoll('Vote \'{}\' added successfully by {}'.format(vote, client.get_ip()))
+            self.server.stats_manager.user_voted(client.ipid)
             client.send_host_message('You have successfully voted! Congratulations.')
 
     def write_votelist(self, poll):

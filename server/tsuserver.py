@@ -30,7 +30,7 @@ from server.districtclient import DistrictClient
 from server.exceptions import ServerError
 from server.masterserverclient import MasterServerClient
 from server.serverpoll_manager import ServerpollManager
-
+from server.database import Database
 
 class TsuServer3:
     def __init__(self):
@@ -63,6 +63,7 @@ class TsuServer3:
         self.load_data()
         self.load_ids()
         self.enable_features()
+        self.stats_manager = Database(self)
         self.district_client = None
         self.ms_client = None
         self.rp_mode = False

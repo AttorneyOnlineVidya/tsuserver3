@@ -173,10 +173,13 @@ class AOProtocol(asyncio.Protocol):
             self.client.server.save_id()
         for ip_id in self.client.server.hdid_list[self.client.hdid]:
             if self.server.ban_manager.is_banned(ip_id):
+                if self.client.hdid in self.server.ban_manager.hdid_exempt:
+                    break
                 self.client.disconnect()
-                logger.log_connect('Connection rejected, Banned. HDID: {}'.format(self.client.ipid, self.client.hdid), self.client)
+                logger.log_connect('Connection rejected, Banned. HDID: {}'.format(self.client.hdid), self.client)
                 return
         logger.log_connect('Connected. HDID: {}.'.format(self.client.hdid), self.client)
+        self.server.stats_manager.connect_data(self.client.ipid, self.client.hdid)
         self.client.send_command('ID', self.client.id, self.server.software, self.server.get_version_string())
         self.client.send_command('PN', self.server.get_player_count() - 1, self.server.config['playerlimit'])
 
@@ -325,6 +328,7 @@ class AOProtocol(asyncio.Protocol):
         cid = args[1]
         try:
             self.client.change_character(cid)
+            self.server.stats_manager.character_picked(cid)
         except ClientError:
             return
 
@@ -394,9 +398,11 @@ class AOProtocol(asyncio.Protocol):
                                       sfx_delay, button, self.client.evi_list[evidence], flip, ding, color)
         self.client.area.set_next_msg_delay(len(msg))
         logger.log_server('[IC][{}][{}]{}'.format(self.client.area.id, self.client.get_char_name(), msg), self.client)
+        self.server.stats_manager.char_talked(self.client.char_id, self.client.ipid, self.client.area.status)
         if color == 2:
             logger.log_mod('[IC][Redtext][{}][{}][{}]{}'.format(self.client.area.id, self.client.area.status,
                                                                 self.client.get_char_name(), msg), self.client)
+
 
     def net_cmd_ct(self, args):
         """ OOC Message
@@ -529,6 +535,7 @@ class AOProtocol(asyncio.Protocol):
                 self.client.area.add_music_playing(self.client, name)
                 logger.log_server('[{}][{}]Changed music to {}.'
                                   .format(self.client.area.id, self.client.get_char_name(), name), self.client)
+                self.server.stats_manager.music_played(name, self.client.area.status)
             except ServerError:
                 return
         except ClientError as ex:

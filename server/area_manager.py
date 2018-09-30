@@ -52,6 +52,7 @@ class AreaManager:
             self.locking_allowed = locking_allowed
             self.owned = False
             self.cards = dict()
+            self.shadow_status = {}
 
             """
             #debug
