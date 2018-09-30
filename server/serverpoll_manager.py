@@ -75,6 +75,7 @@ class ServerpollManager:
                     'votes': {"yes": 0, "no": 0},
                     'created': tmp,
                     'log': [],
+                    'faillog': [],
                 }
                 with open('storage/poll/{} \'{}\'.yaml'.format(test, value), 'w') as file:
                     yaml.dump(newfile, file, default_flow_style=False)
@@ -265,12 +266,12 @@ class ServerpollManager:
                 raise ServerError('Poll not found.')
             stream = open('storage/poll/{} \'{}\'.yaml'.format(poll_voting[1], poll_voting[0]), 'r')
             self.vote = yaml.load(stream)
-            log = self.vote['log']
-            if ([item for item in log if item[1] == client.ipid] or [item for item in log if
-                                                                     item[2] == client.hdid]) and (
-            not self.vote['multivote']):
+            log = self.vote["log"]
+            ipid_voted = self.check_ipid(log, client)
+            hdid_voted = self.check_hdid(log, client)
+            if (ipid_voted or hdid_voted) and (not self.vote['multivote']):
                 # Now to log their failed vote
-                self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
+                self.vote['faillog'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
                                       "{} ({}) at area {}".format(client.name, client.get_char_name(),
                                                                   client.area.name),
                                       "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
@@ -281,9 +282,8 @@ class ServerpollManager:
                         poll[0], vote, client.name, client.get_char_name(), client.area.name, client.ipid, client.hdid,
                         tmp))
                 client.send_host_message('You have already voted in this poll.')
-            elif [item for item in log if
-                  ((item[1] == client.ipid or item[2] == client.hdid) and (item[3].lower() == vote.lower()))]:
-                self.vote['log'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
+            elif (ipid_voted or hdid_voted) and [item for item in log if item[3].lower() == vote.lower()]:
+                self.vote['faillog'] += (['FAILED VOTE', tmp, client.ipid, client.hdid, vote,
                                       "{} ({}) at area {}".format(client.name, client.get_char_name(),
                                                                   client.area.name),
                                       "Times voted: {}, Times spoken in casing: {}, Times used doc: {}".format( data_c.data["times_voted"],data_c.data["times_talked_casing"]
@@ -338,3 +338,22 @@ class ServerpollManager:
             yaml.dump(self.vote, votelist_file, default_flow_style=False)
             #           Clear variables to default now that you're done writing.
             self.vote = []
+
+    def check_ipid(self, log, client):
+        voted = False
+        ipid = client.ipid
+        for item in log:
+            if item[1] == ipid:
+                voted = True
+        return voted
+
+
+    def check_hdid(self, log, client):
+        voted = False
+        hdid = client.hdid
+        if hdid in client.server.ban_manager.hdid_exempt:
+            return voted
+        for item in log:
+            if item[2] == hdid:
+                voted = True
+        return voted
