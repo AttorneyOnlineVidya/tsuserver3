@@ -26,7 +26,7 @@ from server.exceptions import AreaError
 
 class AreaManager:
     class Area:
-        def __init__(self, area_id, server, name, background, bg_lock, evidence_mod='FFA', locking_allowed=False,
+        def __init__(self, area_id, server, name, background, bg_lock, basement, evidence_mod='FFA', locking_allowed=False,
                      iniswap_allowed=True):
             self.iniswap_allowed = iniswap_allowed
             self.clients = set()
@@ -36,6 +36,7 @@ class AreaManager:
             self.background = background
             self.bg_lock = bg_lock
             self.server = server
+            self.basement = basement
             self.music_looper = None
             self.next_message_time = 0
             self.hp_def = 10
@@ -53,6 +54,7 @@ class AreaManager:
             self.owned = False
             self.cards = dict()
             self.shadow_status = {}
+            self.last_talked = None
 
             """
             #debug
@@ -195,7 +197,7 @@ class AreaManager:
                 item['iniswap_allowed'] = True
             self.areas.append(
                 self.Area(self.cur_id, self.server, item['area'], item['background'], item['bglock'],
-                          item['evidence_mod'], item['locking_allowed'], item['iniswap_allowed']))
+                          item['basement'], item['evidence_mod'], item['locking_allowed'], item['iniswap_allowed']))
             self.cur_id += 1
 
     def default_area(self):

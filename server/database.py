@@ -10,9 +10,9 @@ class Database:
         self.character_data = self.make_character_database()
         self.music_data = self.make_music_database()
         self.user_data = self.make_user_database()
-    #    self.check_char_list()
-    #    self.check_music_list()
-    #    self.check_user_list()
+        self.check_char_list()
+        self.check_music_list()
+        self.check_user_list()
         self.write_character_data()
         self.write_music_data()
 
@@ -33,8 +33,9 @@ class Database:
         return data
 
     def write_character_data(self):
+        data = self.character_data
         with open('storage/stats/chars.yaml', 'w') as cdata:
-            yaml.dump(self.character_data, cdata, default_flow_style = False)
+            yaml.dump(data, cdata, default_flow_style = False)
 
     def check_char_list(self):
         for char in self.character_data:
@@ -61,8 +62,9 @@ class Database:
 
 
     def write_music_data(self):
+        data = self.music_data
         with open('storage/stats/music.yaml', 'w') as mdata:
-            yaml.dump(self.music_data, mdata, default_flow_style = False)
+            yaml.dump(data, mdata, default_flow_style = False)
 
     def check_music_list(self):
         for char in self.music_data:
@@ -94,15 +96,15 @@ class Database:
         return data
 
     def write_user_data(self):
+        data = self.user_data
         with open('storage/stats/user.yaml', 'w') as udata:
-            yaml.dump(self.user_data, udata, default_flow_style = False)
+            yaml.dump(data, udata, default_flow_style = False)
 
     def create_new_char_database(self):
         data = {}
         for i, ch in enumerate(self.server.char_list):
             data[i] = charData(i, ch.lower())
         return data
-
 
     def create_new_music_database(self):
         data = {}
@@ -114,11 +116,12 @@ class Database:
 
     def character_picked(self, cid):
         self.character_data[cid].data["picked"] += 1
-        self.write_character_data()
 
     def char_talked(self, cid, ipid, status):
+        print(status.lower())
         if status.lower() == 'idle':
-            self.character_data[cid].data["times_played_idle"] += 1
+            print(self.character_data[cid].data)
+            self.character_data[cid].data["times_talked_idle"] += 1
             self.user_data[ipid].data["times_talked_idle"] += 1
         if status.lower() == 'building-open' or status.lower() == 'building-full' or status.lower() == 'recess':
             self.character_data[cid].data["times_talked_build_recess"] += 1
@@ -126,8 +129,6 @@ class Database:
         if status.lower() == 'casing-open' or status.lower() == 'casing-full':
             self.character_data[cid].data["times_talked_casing"] += 1
             self.user_data[ipid].data["times_talked_casing"] += 1
-        self.write_character_data()
-        self.write_user_data()
 
     def music_played(self, name, status):
         if status.lower() == 'idle':
@@ -136,7 +137,6 @@ class Database:
             self.music_data[name.lower()].data["times_played_build_recess"] += 1
         if status.lower() == 'casing-open' or status.lower() == 'casing-full':
             self.music_data[name.lower()].data["times_played_casing"] += 1
-        self.write_music_data()
 
     def connect_data(self, ipid, hdid):
         if ipid not in self.user_data:
@@ -145,7 +145,6 @@ class Database:
             self.user_data[ipid].data["times_connected"] += 1
             if hdid not in self.user_data[ipid].hdid:
                 self.user_data[ipid].hdid.append(hdid)
-        self.write_user_data()
 
     def kicked_user(self, ipid):
         try:
@@ -176,6 +175,11 @@ class Database:
             self.user_data[ipid].data["times_doc"] += 1
         except IndexError:
             return
+
+    def save_alldata(self):
+        self.write_user_data()
+        self.write_character_data()
+        self.write_music_data()
 
 class charData:
 

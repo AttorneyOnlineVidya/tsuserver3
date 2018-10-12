@@ -398,7 +398,12 @@ class AOProtocol(asyncio.Protocol):
                                       sfx_delay, button, self.client.evi_list[evidence], flip, ding, color)
         self.client.area.set_next_msg_delay(len(msg))
         logger.log_server('[IC][{}][{}]{}'.format(self.client.area.id, self.client.get_char_name(), msg), self.client)
-        self.server.stats_manager.char_talked(self.client.char_id, self.client.ipid, self.client.area.status)
+        if not self.client.area.basement:
+            if self.client.area.last_talked is None:
+                self.client.area.last_talked = self.client.ipid
+                self.server.stats_manager.char_talked(self.client.char_id, self.client.ipid, self.client.area.status)
+            if not self.client.area.last_talked == self.client.ipid:
+                self.server.stats_manager.char_talked(self.client.char_id, self.client.ipid, self.client.area.status)
         if color == 2:
             logger.log_mod('[IC][Redtext][{}][{}][{}]{}'.format(self.client.area.id, self.client.area.status,
                                                                 self.client.get_char_name(), msg), self.client)
