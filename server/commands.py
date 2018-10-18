@@ -250,27 +250,30 @@ def ooc_cmd_kick(client, arg):
     args = arg.split()
     if not len(args) >= 2:
         raise ClientError(
-            'You must specify kick type. /kick [\'ip\',\'ipid\', \'hdid\', \'id\',\'char\' or \'ooc\'] [\'value\'] ')
+            'You must specify kick type. /kick [\'ip\',\'ipid\', \'hdid\', \'id\',\'char\' or \'ooc\'] [\'value\'] [\'OPTIONAL: reason\']')
     if args[0].lower() == 'ip':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.IP, ''.join(args[1:]).strip(), False)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.IP, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'ipid':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.IPID, ''.join(args[1:]).strip(), False)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.IPID, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'hdid':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.HDID, ''.join(args[1:]).strip(), False)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.HDID, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'id':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.ID, ''.join(args[1:]).strip(), False)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.ID, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'char':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.CHAR_NAME, ' '.join(args[1:]), True)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.CHAR_NAME, ''.join(args[1]).strip(), True)
     elif args[0].lower() == 'ooc':
-        kicklist = client.server.client_manager.get_targets(client, TargetType.OOC_NAME, ' '.join(args[1:]), True)
+        kicklist = client.server.client_manager.get_targets(client, TargetType.OOC_NAME, ''.join(args[1]).strip(), True)
     if kicklist:
+        reason = 'None Provided'
+        if len(args) >= 3:
+            reason = ' '.join(args[2:])
         for c in kicklist:
             logger.log_server('Kicked {}.'.format(c.ipid), client)
             client.send_host_message("{} was kicked.".format(c.get_char_name()))
-            c.disconnect()
+            c.kick_ban_wrapper("KK", reason)
         logger.log_mod(
-                '[{}][{}] kicked {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
-                                                                  ''.join(args[1:]).strip(), len(kicklist)), client)
+                '[{}][{}] kicked {}: {}, with {} clients. Reason given: '.format(client.area.id, client.get_char_name(), args[0],
+                                                                  ''.join(args[1]).strip(), len(kicklist), reason), client)
         client.server.stats_manager.kicked_user(c.ipid)
     else:
         client.send_host_message("No targets found.")
@@ -280,41 +283,44 @@ def ooc_cmd_ban(client, arg):
         raise ClientError('You must be authorized to do that.')
     banlist = []
     args = arg.split()
-    if not len(args) == 2:
-        raise ClientError('You must specify ban type. /ban [\'ip\',\'ipid\', \'hdid\' or \'id\'] [\'value\'] ')
+    if not len(args) >= 2:
+        raise ClientError('You must specify ban type. /ban [\'ip\',\'ipid\', \'hdid\' or \'id\'] [\'value\'] [\'OPTIONAL: reason\']')
     if args[0].lower() == 'ip':
-        banlist = client.server.client_manager.get_targets(client, TargetType.IP, ''.join(args[1:]).strip(), False)
+        banlist = client.server.client_manager.get_targets(client, TargetType.IP, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'ipid':
-        banlist = client.server.client_manager.get_targets(client, TargetType.IPID, ''.join(args[1:]).strip(), False)
+        banlist = client.server.client_manager.get_targets(client, TargetType.IPID, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'hdid':
-        banlist = client.server.client_manager.get_targets(client, TargetType.HDID, ''.join(args[1:]).strip(), False)
+        banlist = client.server.client_manager.get_targets(client, TargetType.HDID, ''.join(args[1]).strip(), False)
     elif args[0].lower() == 'id':
-        banlist = client.server.client_manager.get_targets(client, TargetType.ID, ''.join(args[1:]).strip(), False)
+        banlist = client.server.client_manager.get_targets(client, TargetType.ID, ''.join(args[1]).strip(), False)
     if banlist or args[0].lower() == 'ip' or args[0].lower() == 'ipid':
         try:
             ban = banlist[0].ipid
             actual = ban
         except IndexError:
             if args[0].lower() == 'ip':
-                ban = ''.join(args[1:]).strip()
+                ban = ''.join(args[1]).strip()
                 actual = client.server.get_ipid(ban)
             if args[0].lower() == 'ipid':
-                if len(''.join(args[1:]).strip()) != 12:
+                if len(''.join(args[1]).strip()) != 12:
                     client.send_host_message("Invalid IPID.")
                     return
-                ban = ''.join(args[1:]).strip()
+                ban = ''.join(args[1]).strip()
                 actual = ban
         try:
             client.server.ban_manager.add_ban(actual)
         except ServerError:
             raise
+        reason = 'None Provided'
+        if len(args) >= 3:
+            reason = ' '.join(args[2:])
         for c in banlist:
-            c.disconnect()
+            c.kick_ban_wrapper("KB", reason)
         client.send_host_message('{} clients were kicked.'.format(len(banlist)))
         client.send_host_message('{} was banned.'.format(ban))
         logger.log_mod(
-                '[{}][{}] banned {}: {}, with {} clients.'.format(client.area.id, client.get_char_name(), args[0],
-                                                                  ''.join(args[1:]).strip(), len(banlist)), client)
+                '[{}][{}] banned {}: {}, with {} clients. Reason given: '.format(client.area.id, client.get_char_name(), args[0],
+                                                                  ''.join(args[1]).strip(), len(banlist), reason), client)
         if args[0].lower() == 'ipid' or args[0].lower() == 'ip':
             client.server.stats_manager.banned_user(actual)
         else:
