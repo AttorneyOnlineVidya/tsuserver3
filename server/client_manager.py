@@ -109,6 +109,10 @@ class ClientManager:
                     return False
             return True
 
+        def kick_ban_wrapper(self, command_to_use="KK", reason="N/A"):
+            self.send_command(command_to_use, reason)
+            self.disconnect()
+
         def disconnect(self):
             self.transport.close()
 
@@ -360,7 +364,7 @@ class ClientManager:
                     if value.lower().startswith(client.get_ipreal().lower()):
                         targets.append(client)
                 elif key == TargetType.OOC_NAME:
-                    if value.lower() == client.name.lower() and client.name:
+                    if value.lower().strip() == client.name.lower().strip() and client.name:
                         targets.append(client)
                 elif key == TargetType.CHAR_NAME:
                     if value.lower() == client.get_char_name().lower():
