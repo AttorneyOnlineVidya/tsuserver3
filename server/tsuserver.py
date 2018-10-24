@@ -136,7 +136,6 @@ class TsuServer3:
         while self.runner:
             await asyncio.sleep(1)
             self.runtime += 1
-            print(self.runtime)
             if self.runtime % 300 == 0:
                 for area in self.area_manager.areas:
                     area.last_talked = None
