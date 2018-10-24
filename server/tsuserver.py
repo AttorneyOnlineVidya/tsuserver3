@@ -69,9 +69,8 @@ class TsuServer3:
         self.district_client = None
         self.ms_client = None
         self.rp_mode = False
-        self.runner = None
+        self.runner = True
         self.runtime = 0
-        self.load_runner()
         logger.setup_logger(debug=self.config['debug'], log_size=self.config['log_size'],
                             log_backups=self.config['log_backups'], areas=self.area_manager.areas)
 
@@ -96,12 +95,14 @@ class TsuServer3:
         logger.log_debug('Server started.')
         print("Welcome to AOVserver version " + str(self.release) + "." + str(self.major_version) + "." + str(self.minor_version))
 
+        loop.run_until_complete(self.load_runner())
         try:
             loop.run_forever()
         except KeyboardInterrupt:
             pass
 
         logger.log_debug('Server shutting down.')
+        self.runner = False
         ao_server.close()
         loop.run_until_complete(ao_server.wait_closed())
         loop.close()
@@ -131,19 +132,18 @@ class TsuServer3:
     def get_player_count(self):
         return len(self.client_manager.clients)
 
-    def running_check(self, runner):
-        self.runtime += 1
-        if self.runtime % 60 == 0:
-            for area in self.area_manager.areas:
-                print(area.last_talked)
-                area.last_talked = None
-            self.stats_manager.save_alldata()
+    async def running_check(self):
+        while self.runner:
+            await asyncio.sleep(1)
+            self.runtime += 1
+            print(self.runtime)
+            if self.runtime % 300 == 0:
+                for area in self.area_manager.areas:
+                    area.last_talked = None
+                self.stats_manager.save_alldata()
 
-        Timer(1, self.running_check, [runner]).start()
-
-    def load_runner(self):
-        self.runner = threading.Event()
-        self.running_check(self.runner)
+    async def load_runner(self):
+        asyncio.ensure_future(self.running_check())
 
     def load_config(self):
         with open('config/config.yaml', 'r', encoding='utf-8') as cfg:

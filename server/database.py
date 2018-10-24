@@ -1,5 +1,7 @@
 import yaml
 import os
+import copy
+
 class Database:
 
     def __init__(self, server):
@@ -33,7 +35,7 @@ class Database:
         return data
 
     def write_character_data(self):
-        data = self.character_data
+        data = copy.deepcopy(self.character_data)
         with open('storage/stats/chars.yaml', 'w') as cdata:
             yaml.dump(data, cdata, default_flow_style = False)
 
@@ -62,7 +64,7 @@ class Database:
 
 
     def write_music_data(self):
-        data = self.music_data
+        data = copy.deepcopy(self.music_data)
         with open('storage/stats/music.yaml', 'w') as mdata:
             yaml.dump(data, mdata, default_flow_style = False)
 
@@ -72,7 +74,6 @@ class Database:
             for index in list(obj.indexes.keys()):
                 if index not in obj.data:
                     obj.data[index] = obj.indexes[index]
-
 
     def check_user_list(self):
         for char in self.user_data:
@@ -96,7 +97,7 @@ class Database:
         return data
 
     def write_user_data(self):
-        data = self.user_data
+        data = copy.deepcopy(self.user_data)
         with open('storage/stats/user.yaml', 'w') as udata:
             yaml.dump(data, udata, default_flow_style = False)
 
@@ -118,9 +119,7 @@ class Database:
         self.character_data[cid].data["picked"] += 1
 
     def char_talked(self, cid, ipid, status):
-        print(status.lower())
         if status.lower() == 'idle':
-            print(self.character_data[cid].data)
             self.character_data[cid].data["times_talked_idle"] += 1
             self.user_data[ipid].data["times_talked_idle"] += 1
         if status.lower() == 'building-open' or status.lower() == 'building-full' or status.lower() == 'recess':
