@@ -49,7 +49,7 @@ class TsuServer3:
         self.software = 'tsuserver3'
         self.version = 'tsuserver3dev'
         self.release = 3
-        self.major_version = 2
+        self.major_version = 3
         self.minor_version = 0
         self.char_list = None
         self.char_pages_ao1 = None
@@ -145,7 +145,7 @@ class TsuServer3:
         asyncio.ensure_future(self.running_check())
 
     def load_config(self):
-        with open('config/config.yaml', 'r', encoding='utf-8') as cfg:
+        with open('config/config.yaml', 'r', encoding='utf-8') as    cfg:
             self.config = yaml.load(cfg)
             self.config['motd'] = self.config['motd'].replace('\\n', ' \n')
         if 'music_change_floodguard' not in self.config:
