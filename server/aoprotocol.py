@@ -428,7 +428,9 @@ class AOProtocol(asyncio.Protocol):
         if self.client.name.startswith(self.server.config['hostname']) or self.client.name.startswith('<dollar>G') or self.client.name.startswith('<dollar>Н'):
             self.client.send_host_message('That name is reserved!')
             return
-
+        if len(self.client.name) > 15:
+            self.client.send_host_message('OOC name must be lower or equal than 15 characters.')
+            return
         if self.client.voting == 2:
             polls = self.client.server.serverpoll_manager.show_poll_list()
             choices = self.client.server.serverpoll_manager.get_poll_choices(polls[self.client.voting_at])

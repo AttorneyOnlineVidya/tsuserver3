@@ -211,7 +211,7 @@ def ooc_cmd_forcepos(client, arg):
             client, TargetType.CHAR_NAME, " ".join(args[1:]), True)
         if len(targets) == 0 and args[1].isdigit():
             targets = client.server.client_manager.get_targets(
-                client, TargetType.ID, int(arg[1]), True)
+                client, TargetType.ID, int("".join(args[1:])), True)
         if len(targets) == 0:
             targets = client.server.client_manager.get_targets(
                 client, TargetType.OOC_NAME, " ".join(args[1:]), True)
@@ -220,7 +220,6 @@ def ooc_cmd_forcepos(client, arg):
     else:
         for c in client.area.clients:
             targets.append(c)
-
     for t in targets:
         try:
             t.change_position(pos)
